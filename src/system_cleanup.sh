@@ -442,11 +442,9 @@ log_message "SECTION 10: Cleanup Summary"
 # Section 11: Clean Android Studio files
 log_message "SECTION 11: Checking Android Studio"
 
-# Skip if --no-android flag is used (가정: 이 플래그를 추가할 경우)
 if [ "$SKIP_ANDROID" = true ]; then
     log_message "Skipping Android Studio cleanup (--no-android flag detected)"
 else
-    # Check if Android Studio is installed
     if [ -d "$HOME/Library/Android" ] || [ -d "$HOME/Android" ]; then
         log_message "Android Studio is installed. Checking for cleanable files..."
         
@@ -470,15 +468,21 @@ else
             log_message "Android SDK temp files size: $sdk_temp_size"
         fi
         
+        # Check AVD directory size
+        if [ -d "$HOME/.android/avd" ]; then
+            avd_size=$(du -sh "$HOME/.android/avd" 2>/dev/null | awk '{print $1}')
+            log_message "Android Virtual Device (AVD) files size: $avd_size"
+            log_message "WARNING: AVD files will be preserved to maintain virtual device settings and data"
+        fi
+        
         # 2. Perform cleanups based on mode
         if [ "$DRY_RUN" = true ]; then
-            # Dry run mode
             log_message "DRY RUN: Would clean the following Android Studio related files:"
             log_message "DRY RUN: - Gradle caches older than 30 days"
             log_message "DRY RUN: - Android SDK temp files"
             log_message "DRY RUN: - Android build directories in inactive projects"
-            
-        elif [[ "$1" == "--auto-clean" ]]; then
+            log_message "DRY RUN: - AVD files will be preserved"
+        else
             # Auto-clean mode - be careful with what we auto-clean
             log_message "Auto-cleaning Android Studio files..."
             
@@ -501,6 +505,13 @@ else
             if [ -n "$android_builds" ]; then
                 log_message "Found the following Android build directories you may want to clean manually:"
                 echo "$android_builds" | tee -a "$LOG_FILE"
+            fi
+            
+            # AVD 파일 보호 강화
+            log_message "Preserving Android Virtual Device (AVD) files..."
+            if [ -d "$HOME/.android/avd" ]; then
+                log_message "AVD directory found: $HOME/.android/avd"
+                log_message "AVD files will be preserved to maintain virtual device settings and data"
             fi
             
         else
