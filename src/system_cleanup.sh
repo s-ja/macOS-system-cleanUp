@@ -123,11 +123,9 @@ log_message "----------------------------------------"
 # Section 3: Clean Homebrew
 log_message "SECTION 3: Checking Homebrew"
 
-# Skip if --no-brew flag is used
 if [ "$SKIP_BREW" = true ]; then
     log_message "Skipping Homebrew cleanup (--no-brew flag detected)"
 else
-    # Check if brew is installed
     if command -v brew &>/dev/null; then
         # Get initial size of Homebrew cache
         brew_cache_dir=$(brew --cache)
@@ -135,15 +133,20 @@ else
         log_message "Homebrew cache size before cleaning: $brew_cache_size_before"
         
         if [ "$DRY_RUN" = true ]; then
-            # Dry run mode
-            log_message "DRY RUN: Would update Homebrew"
+            log_message "DRY RUN: Would update Homebrew and installed packages"
+            log_message "DRY RUN: Would run brew doctor"
             log_message "DRY RUN: Would check for outdated packages"
             log_message "DRY RUN: Would remove unused dependencies"
             log_message "DRY RUN: Would clean up Homebrew cache and old versions"
         else
-            # Update Homebrew
-            log_message "Updating Homebrew..."
+            # Update Homebrew and upgrade all installed packages
+            log_message "Updating Homebrew and upgrading installed packages..."
             brew update 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to update Homebrew"
+            brew upgrade 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to upgrade packages"
+            
+            # Run brew doctor to check for potential problems
+            log_message "Running brew doctor to check for potential problems..."
+            brew doctor 2>&1 | tee -a "$LOG_FILE" || handle_error "Brew doctor check failed"
             
             # Check for outdated packages
             log_message "Checking for outdated packages..."
@@ -153,7 +156,6 @@ else
             log_message "Checking for unused dependencies..."
             brew autoremove -n 2>&1 | tee -a "$LOG_FILE"
             
-            # If auto-clean flag is set, automatically remove unused dependencies
             if [[ "$1" == "--auto-clean" ]]; then
                 log_message "Auto-removing unused dependencies..."
                 brew autoremove 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to remove unused dependencies"
