@@ -529,6 +529,106 @@ else
     fi
 fi
 
+
+# Section 12: XCode cleanup (추가 섹션)
+log_message "SECTION 12: Checking XCode related files"
+
+if [ -d "$HOME/Library/Developer/Xcode" ]; then
+    log_message "XCode detected. Checking for cleanable files..."
+    
+    # Check DerivedData
+    if [ -d "$HOME/Library/Developer/Xcode/DerivedData" ]; then
+        derived_size=$(du -sh "$HOME/Library/Developer/Xcode/DerivedData" 2>/dev/null | awk '{print $1}')
+        log_message "XCode DerivedData size: $derived_size"
+        
+        if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clean XCode DerivedData? (y/n): " xcode_clean && [[ "$xcode_clean" == "y" || "$xcode_clean" == "Y" ]]); then
+            log_message "Cleaning XCode DerivedData..."
+            rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null
+        fi
+    fi
+    
+    # Check iOS Device Support (can be very large)
+    if [ -d "$HOME/Library/Developer/Xcode/iOS DeviceSupport" ]; then
+        devicesupport_size=$(du -sh "$HOME/Library/Developer/Xcode/iOS DeviceSupport" 2>/dev/null | awk '{print $1}')
+        log_message "iOS Device Support files size: $devicesupport_size"
+        
+        # This is a more cautious cleanup - only suggest, not auto-clean
+        log_message "Consider manually removing old iOS device support files to free up space"
+    fi
+    
+    # Check Archives
+    if [ -d "$HOME/Library/Developer/Xcode/Archives" ]; then
+        archives_size=$(du -sh "$HOME/Library/Developer/Xcode/Archives" 2>/dev/null | awk '{print $1}')
+        log_message "XCode Archives size: $archives_size"
+        
+        if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clean old XCode Archives (older than 90 days)? (y/n): " archives_clean && [[ "$archives_clean" == "y" || "$archives_clean" == "Y" ]]); then
+            log_message "Cleaning XCode Archives older than 90 days..."
+            find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null
+        fi
+    fi
+    
+    # Check iOS Simulator caches
+    if [ -d "$HOME/Library/Developer/CoreSimulator" ]; then
+        simulator_size=$(du -sh "$HOME/Library/Developer/CoreSimulator" 2>/dev/null | awk '{print $1}')
+        log_message "iOS Simulator files size: $simulator_size"
+        
+        if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Delete unused iOS Simulators? (y/n): " simulator_clean && [[ "$simulator_clean" == "y" || "$simulator_clean" == "Y" ]]); then
+            if command -v xcrun &>/dev/null; then
+                log_message "Cleaning unused iOS Simulators..."
+                xcrun simctl delete unavailable 2>&1 | tee -a "$LOG_FILE"
+            else
+                log_message "xcrun command not found, skipping simulator cleanup"
+            fi
+        fi
+    fi
+else
+    log_message "XCode not detected on this system"
+fi
+
+# Section 13: macOS specific cleanup
+log_message "SECTION 13: macOS specific cleanup"
+
+# Check and clean Language resources (careful with this)
+if [ "$DRY_RUN" = false ] && [[ "$1" == "--auto-clean" ]] || read -p "Would you like to check for unused language resources? (y/n): " lang_check && [[ "$lang_check" == "y" || "$lang_check" == "Y" ]]; then
+    log_message "Checking for large language resource directories..."
+    
+    # Find top 10 largest localization directories
+    large_locales=$(find /Applications -path "*.lproj" -type d -not -path "*/en.lproj" -not -path "*/Base.lproj" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
+    
+    if [ -n "$large_locales" ]; then
+        log_message "Found the following large localization directories:"
+        echo "$large_locales" | tee -a "$LOG_FILE"
+        log_message "WARNING: Removing these may affect applications. Consider manual review."
+    else
+        log_message "No significant localization directories found."
+    fi
+fi
+
+# Check for large files in Application Support
+log_message "Checking for large files in Application Support..."
+large_app_support=$(find "$HOME/Library/Application Support" -type f -size +100M -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
+
+if [ -n "$large_app_support" ]; then
+    log_message "Found the following large files in Application Support:"
+    echo "$large_app_support" | tee -a "$LOG_FILE"
+    log_message "NOTE: These files may be important for your applications. Review manually before removing."
+fi
+
+# Clear system caches if requested with sudo
+if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clear system caches (requires sudo)? (y/n): " syscache_clean && [[ "$syscache_clean" == "y" || "$syscache_clean" == "Y" ]]); then
+    log_message "WARNING: System cache cleaning may affect system performance temporarily"
+    log_message "Clearing system caches..."
+    sudo rm -rf /Library/Caches/* 2>/dev/null
+    sudo rm -rf /System/Library/Caches/* 2>/dev/null
+    log_message "System caches cleared"
+fi
+
+# Check for sleepimage file (can be very large)
+if [ -f "/private/var/vm/sleepimage" ]; then
+    sleepimage_size=$(du -sh "/private/var/vm/sleepimage" 2>/dev/null | awk '{print $1}')
+    log_message "Found sleepimage file, size: $sleepimage_size"
+    log_message "WARNING: Modifying sleepimage may affect system sleep functionality. Proceed with caution."
+fi
 log_message "----------------------------------------"
 
 # Calculate space saved
@@ -558,3 +658,11 @@ echo "5. Using tools like OmniDiskSweeper or GrandPerspective to find large file
 echo ""
 echo "For additional options, run: $0 --help"
 echo "Log file saved to: $LOG_FILE"
+
+if pgrep -x "Xcode" > /dev/null; then
+    log_message "WARNING: XCode is running. Please close XCode before cleaning."
+    exit 1
+fi
+
+log_message "Verifying system cache regeneration..."
+sudo update_dyld_shared_cache 2>/dev/null || log_message "Cache regeneration may need manual intervention"
