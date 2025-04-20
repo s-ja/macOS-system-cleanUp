@@ -393,12 +393,27 @@ log_message "SECTION 9: Checking for .DS_Store files"
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would scan for and count .DS_Store files"
 else
-    # Count and calculate size of all .DS_Store files
-    ds_store_count=$(find "$HOME" -name ".DS_Store" -type f 2>/dev/null | wc -l)
+    # Count and calculate size of all .DS_Store files with progress
+    log_message "Scanning for .DS_Store files..."
     
-    if [ "$ds_store_count" -gt 0 ]; then
-        ds_store_size=$(find "$HOME" -name ".DS_Store" -type f -exec du -ch {} \; 2>/dev/null | grep total$ | cut -f1)
-        log_message "Found $ds_store_count .DS_Store files, total size: $ds_store_size"
+    # Initialize counters
+    total_found=0
+    total_size=0
+    
+    # Find all .DS_Store files with progress
+    while IFS= read -r -d '' file; do
+        total_found=$((total_found + 1))
+        file_size=$(du -h "$file" 2>/dev/null | cut -f1)
+        total_size=$(echo "$total_size + $(du -k "$file" 2>/dev/null | cut -f1)" | bc)
+        
+        # Show progress every 100 files
+        if [ $((total_found % 100)) -eq 0 ]; then
+            log_message "Found $total_found .DS_Store files so far..."
+        fi
+    done < <(find "$HOME" -name ".DS_Store" -type f -print0)
+    
+    if [ "$total_found" -gt 0 ]; then
+        log_message "Found $total_found .DS_Store files, total size: $(numfmt --to=iec-i --suffix=B $((total_size * 1024)))"
         
         if [[ "$1" == "--auto-clean" ]]; then
             log_message "Auto-cleaning .DS_Store files..."
