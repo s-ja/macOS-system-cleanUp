@@ -77,12 +77,34 @@ log_message() {
 calculate_space_saved() {
     local before=$1
     local after=$2
-    local unit=$3
     
     if [[ $before =~ ^[0-9]+$ ]] && [[ $after =~ ^[0-9]+$ ]]; then
-        echo "$((before - after))$unit"
+        local saved=$((after - before))
+        if [ $saved -ge 1073741824 ]; then
+            echo "$(echo "scale=2; $saved/1073741824" | bc)GB"
+        elif [ $saved -ge 1048576 ]; then
+            echo "$(echo "scale=2; $saved/1048576" | bc)MB"
+        elif [ $saved -ge 1024 ]; then
+            echo "$(echo "scale=2; $saved/1024" | bc)KB"
+        else
+            echo "${saved}B"
+        fi
     else
         echo "Unable to calculate"
+    fi
+}
+
+# Function to format disk space
+format_disk_space() {
+    local space=$1
+    if [ $space -ge 1073741824 ]; then
+        echo "$(echo "scale=2; $space/1073741824" | bc)GB"
+    elif [ $space -ge 1048576 ]; then
+        echo "$(echo "scale=2; $space/1048576" | bc)MB"
+    elif [ $space -ge 1024 ]; then
+        echo "$(echo "scale=2; $space/1024" | bc)KB"
+    else
+        echo "${space}B"
     fi
 }
 
@@ -94,35 +116,97 @@ log_message "========================================="
 INITIAL_FREE_SPACE=$(df -k / | awk 'NR==2 {print $4}')
 log_message "Initial free space: $(df -h / | awk 'NR==2 {print $4}')"
 
-# Section 1: Check disk usage
-log_message "SECTION 1: Checking disk usage"
+# Section 1: System Overview
+log_message "SECTION 1: System Overview"
 df -h / | tee -a "$LOG_FILE"
 log_message "----------------------------------------"
 
-# Section 2: Check user cache sizes
-log_message "SECTION 2: Checking cache sizes"
+# Section 2: System Library and Cache Cleanup
+log_message "SECTION 2: System Library and Cache Cleanup"
 
-# Check user Library cache
-if [ -d "$HOME/Library/Caches" ]; then
-    cache_size=$(du -sh "$HOME/Library/Caches" 2>/dev/null | awk '{print $1}')
-    log_message "User Library cache size: $cache_size"
+if [ "$DRY_RUN" = true ]; then
+    log_message "DRY RUN: Would clean system library caches and logs"
 else
-    log_message "User Library cache not found"
-fi
-
-# Check Downloads folder
-if [ -d "$HOME/Downloads" ]; then
-    downloads_size=$(du -sh "$HOME/Downloads" 2>/dev/null | awk '{print $1}')
-    log_message "Downloads folder size: $downloads_size"
-else
-    log_message "Downloads folder not found"
+    # System library cache cleanup
+    log_message "Checking system library cache cleanup permissions..."
+    if [ "$(id -u)" = "0" ]; then
+        log_message "Cleaning system library caches..."
+        rm -rf /Library/Caches/* 2>/dev/null || log_message "Skipping system library cache cleanup due to permission restrictions"
+    else
+        log_message "Skipping system library cache cleanup - requires root privileges"
+    fi
+    
+    # System logs cleanup
+    log_message "Checking system logs cleanup permissions..."
+    if [ "$(id -u)" = "0" ]; then
+        log_message "Cleaning system logs..."
+        rm -rf /var/log/* 2>/dev/null || log_message "Skipping system logs cleanup due to permission restrictions"
+    else
+        log_message "Skipping system logs cleanup - requires root privileges"
+    fi
+    
+    # User library cache cleanup
+    log_message "Checking user library cache cleanup permissions..."
+    if [ -w "$HOME/Library/Caches" ]; then
+        log_message "Cleaning user library caches..."
+        rm -rf ~/Library/Caches/* 2>/dev/null || log_message "Skipping user library cache cleanup due to permission restrictions"
+    else
+        log_message "Skipping user library cache cleanup - insufficient permissions"
+    fi
+    
+    # Temporary items cleanup
+    log_message "Checking temporary items cleanup permissions..."
+    if [ -w "$HOME/Library/TemporaryItems" ]; then
+        log_message "Cleaning temporary items..."
+        rm -rf ~/Library/TemporaryItems/* 2>/dev/null || log_message "Skipping temporary items cleanup due to permission restrictions"
+    else
+        log_message "Skipping temporary items cleanup - insufficient permissions"
+    fi
 fi
 
 log_message "----------------------------------------"
 
-# Section 3: Clean Homebrew
-log_message "SECTION 3: Checking Homebrew"
+# Section 3: Time Machine Local Snapshots
+log_message "SECTION 3: Time Machine Local Snapshots"
 
+if [ "$DRY_RUN" = true ]; then
+    log_message "DRY RUN: Would check and manage Time Machine local snapshots"
+else
+    if command -v tmutil &>/dev/null; then
+        # List local snapshots
+        log_message "Checking Time Machine local snapshots..."
+        local_snapshots=$(tmutil listlocalsnapshots / 2>/dev/null)
+        
+        if [ -n "$local_snapshots" ]; then
+            log_message "Found the following local snapshots:"
+            echo "$local_snapshots" | tee -a "$LOG_FILE"
+            
+            if [[ "$1" == "--auto-clean" ]]; then
+                log_message "Auto-cleaning local snapshots..."
+                sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean local snapshots"
+            else
+                read -p "Would you like to remove local snapshots? (y/n): " remove_snapshots
+                if [[ "$remove_snapshots" == "y" || "$remove_snapshots" == "Y" ]]; then
+                    log_message "Removing local snapshots..."
+                    sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean local snapshots"
+                else
+                    log_message "Skipping local snapshots cleanup"
+                fi
+            fi
+        else
+            log_message "No local snapshots found"
+        fi
+    else
+        log_message "tmutil command not found, skipping Time Machine cleanup"
+    fi
+fi
+
+log_message "----------------------------------------"
+
+# Section 4: Development Tools Cleanup
+log_message "SECTION 4: Development Tools Cleanup"
+
+# Subsection 4.1: Homebrew Cleanup
 if [ "$SKIP_BREW" = true ]; then
     log_message "Skipping Homebrew cleanup (--no-brew flag detected)"
 else
@@ -174,16 +258,10 @@ else
     fi
 fi
 
-log_message "----------------------------------------"
-
-# Section 4: Clean npm cache
-log_message "SECTION 4: Checking npm cache"
-
-# Skip if --no-npm flag is used
+# Subsection 4.2: npm Cleanup
 if [ "$SKIP_NPM" = true ]; then
     log_message "Skipping npm cache cleanup (--no-npm flag detected)"
 else
-    # Check if npm is installed
     if command -v npm &>/dev/null; then
         # Get npm cache size before cleaning
         npm_cache_dir=$(npm config get cache)
@@ -227,129 +305,7 @@ else
     fi
 fi
 
-log_message "----------------------------------------"
-
-# Section 5: Check system logs
-log_message "SECTION 5: Checking system logs"
-
-# Check system log sizes (requires sudo)
-log_message "System log sizes (requires sudo):"
-sudo du -sh /var/log/* 2>/dev/null | tee -a "$LOG_FILE" || log_message "Could not access system logs (sudo may be required)"
-
-log_message "----------------------------------------"
-
-# Section 6: Check for Docker and clean if installed
-log_message "SECTION 6: Checking Docker"
-
-# Skip if --no-docker flag is used
-if [ "$SKIP_DOCKER" = true ]; then
-    log_message "Skipping Docker cleanup (--no-docker flag detected)"
-else
-    if command -v docker &>/dev/null; then
-        log_message "Docker is installed. Checking Docker disk usage..."
-        docker system df 2>&1 | tee -a "$LOG_FILE"
-        
-        if [ "$DRY_RUN" = true ]; then
-            # Dry run mode - show what would be cleaned
-            log_message "DRY RUN: Would clean the following Docker resources:"
-            
-            # Show unused images that would be removed
-            log_message "DRY RUN: Unused images:"
-            docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE"
-            
-            # Show unused containers that would be removed
-            log_message "DRY RUN: Stopped containers:"
-            docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE"
-            
-            # Show unused volumes that would be removed
-            log_message "DRY RUN: Unused volumes:"
-            docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE"
-        
-        # Make Docker cleanup non-interactive with a command line flag
-        elif [[ "$1" == "--auto-clean" ]]; then
-            log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
-            # Capture disk usage before cleaning
-            docker_before=$(docker system df --format '{{.TotalSize}}' 2>/dev/null)
-            
-            # Perform Docker cleanup
-            log_message "Cleaning Docker images, containers, and networks..."
-            docker system prune -af 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker resources"
-            
-            # Include volume cleanup for more thorough cleaning
-            log_message "Cleaning Docker volumes..."
-            docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker volumes"
-            
-            # Capture disk usage after cleaning
-            docker_after=$(docker system df --format '{{.TotalSize}}' 2>/dev/null)
-            log_message "Docker cleanup complete. Space reclaimed: $((docker_before - docker_after)) bytes"
-        else
-            read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean
-            if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
-                log_message "Cleaning Docker resources..."
-                docker system prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker resources"
-                
-                read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean
-                if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
-                    log_message "Cleaning Docker volumes..."
-                    docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker volumes"
-                fi
-            else
-                log_message "Skipping Docker cleanup"
-            fi
-        fi
-    else
-        log_message "Docker is not installed on this system"
-    fi
-fi
-
-log_message "----------------------------------------"
-
-# Section 7: Clean node_modules directories
-log_message "SECTION 7: Checking for large node_modules directories"
-
-# Function to find large node_modules directories
-find_large_node_modules() {
-    log_message "Searching for large node_modules directories..."
-    
-    # Find top 10 largest node_modules directories
-    large_dirs=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
-    
-    if [ -n "$large_dirs" ]; then
-        log_message "Found the following large node_modules directories:"
-        echo "$large_dirs" | tee -a "$LOG_FILE"
-        
-        if [ "$DRY_RUN" = false ] && [[ "$1" == "--auto-clean" ]]; then
-            log_message "Checking for unused node_modules (projects not modified in last 90 days)..."
-            
-            # Find project directories with node_modules that haven't been modified in over 90 days
-            old_projects=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -mtime +90 -exec dirname {} \; 2>/dev/null)
-            
-            if [ -n "$old_projects" ]; then
-                log_message "Found the following potentially unused projects (not modified in 90+ days):"
-                echo "$old_projects" | tee -a "$LOG_FILE"
-                log_message "You may want to consider removing these manually."
-            else
-                log_message "No potentially unused node_modules directories found."
-            fi
-        fi
-    else
-        log_message "No large node_modules directories found."
-    fi
-}
-
-# Only run if not in dry run mode or specifically requested
-if [ "$DRY_RUN" = true ]; then
-    log_message "DRY RUN: Would scan for large node_modules directories"
-else
-    find_large_node_modules "$1"
-fi
-
-log_message "----------------------------------------"
-
-# Section 8: Clean Yarn cache
-log_message "SECTION 8: Checking Yarn cache"
-
-# Check if yarn is installed
+# Subsection 4.3: Yarn Cache Cleanup
 if command -v yarn &>/dev/null; then
     log_message "Yarn is installed. Checking cache..."
     
@@ -385,63 +341,83 @@ else
     log_message "Yarn is not installed on this system"
 fi
 
-log_message "----------------------------------------"
+# Subsection 4.4: node_modules Cleanup
+log_message "Checking for large node_modules directories..."
 
-# Section 9: Check for large .DS_Store files
-log_message "SECTION 9: Checking for .DS_Store files"
-
+# Find large node_modules directories
 if [ "$DRY_RUN" = true ]; then
-    log_message "DRY RUN: Would scan for and count .DS_Store files"
+    log_message "DRY RUN: Would scan for large node_modules directories"
 else
-    # Count and calculate size of all .DS_Store files with progress
-    log_message "Scanning for .DS_Store files..."
+    # Find top 10 largest node_modules directories
+    large_dirs=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
     
-    # Initialize counters
-    total_found=0
-    total_size=0
-    
-    # Find all .DS_Store files with progress
-    while IFS= read -r -d '' file; do
-        total_found=$((total_found + 1))
-        file_size=$(du -h "$file" 2>/dev/null | cut -f1)
-        total_size=$(echo "$total_size + $(du -k "$file" 2>/dev/null | cut -f1)" | bc)
-        
-        # Show progress every 100 files
-        if [ $((total_found % 100)) -eq 0 ]; then
-            log_message "Found $total_found .DS_Store files so far..."
-        fi
-    done < <(find "$HOME" -name ".DS_Store" -type f -print0)
-    
-    if [ "$total_found" -gt 0 ]; then
-        log_message "Found $total_found .DS_Store files, total size: $(numfmt --to=iec-i --suffix=B $((total_size * 1024)))"
+    if [ -n "$large_dirs" ]; then
+        log_message "Found the following large node_modules directories:"
+        echo "$large_dirs" | tee -a "$LOG_FILE"
         
         if [[ "$1" == "--auto-clean" ]]; then
-            log_message "Auto-cleaning .DS_Store files..."
-            find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null
-            log_message "Removed .DS_Store files"
-        else
-            read -p "Would you like to remove all .DS_Store files? (y/n): " ds_clean
-            if [[ "$ds_clean" == "y" || "$ds_clean" == "Y" ]]; then
-                log_message "Removing .DS_Store files..."
-                find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null
-                log_message "Removed .DS_Store files"
+            log_message "Checking for unused node_modules (projects not modified in last 90 days)..."
+            
+            # Find project directories with node_modules that haven't been modified in over 90 days
+            old_projects=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -mtime +90 -exec dirname {} \; 2>/dev/null)
+            
+            if [ -n "$old_projects" ]; then
+                log_message "Found the following potentially unused projects (not modified in 90+ days):"
+                echo "$old_projects" | tee -a "$LOG_FILE"
+                log_message "You may want to consider removing these manually."
             else
-                log_message "Skipping .DS_Store cleanup"
+                log_message "No potentially unused node_modules directories found."
             fi
         fi
     else
-        log_message "No .DS_Store files found"
+        log_message "No large node_modules directories found."
     fi
 fi
 
-log_message "----------------------------------------"
+# Subsection 4.5: Docker Cleanup
+if [ "$SKIP_DOCKER" = true ]; then
+    log_message "Skipping Docker cleanup (--no-docker flag detected)"
+else
+    if command -v docker &>/dev/null; then
+        log_message "Docker is installed. Checking Docker disk usage..."
+        docker system df 2>&1 | tee -a "$LOG_FILE"
+        
+        if [ "$DRY_RUN" = true ]; then
+            # Dry run mode - show what would be cleaned
+            log_message "DRY RUN: Would clean the following Docker resources:"
+            docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE"
+            docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE"
+            docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE"
+        elif [[ "$1" == "--auto-clean" ]]; then
+            log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
+            docker_before=$(docker system df --format '{{.TotalSize}}' 2>/dev/null)
+            docker system prune -af 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker resources"
+            docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker volumes"
+            docker_after=$(docker system df --format '{{.TotalSize}}' 2>/dev/null)
+            log_message "Docker cleanup complete. Space reclaimed: $((docker_before - docker_after)) bytes"
+        else
+            read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean
+            if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
+                log_message "Cleaning Docker resources..."
+                docker system prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker resources"
+                
+                read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean
+                if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
+                    log_message "Cleaning Docker volumes..."
+                    docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker volumes"
+                else
+                    log_message "Skipping Docker volumes cleanup"
+                fi
+            else
+                log_message "Skipping Docker cleanup"
+            fi
+        fi
+    else
+        log_message "Docker is not installed on this system"
+    fi
+fi
 
-# Section 10: Summary report
-log_message "SECTION 10: Cleanup Summary"
-
-# Section 11: Clean Android Studio files
-log_message "SECTION 11: Checking Android Studio"
-
+# Subsection 4.6: Android Studio Cleanup
 if [ "$SKIP_ANDROID" = true ]; then
     log_message "Skipping Android Studio cleanup (--no-android flag detected)"
 else
@@ -482,7 +458,7 @@ else
             log_message "DRY RUN: - Android SDK temp files"
             log_message "DRY RUN: - Android build directories in inactive projects"
             log_message "DRY RUN: - AVD files will be preserved"
-        else
+        elif [[ "$1" == "--auto-clean" ]]; then
             # Auto-clean mode - be careful with what we auto-clean
             log_message "Auto-cleaning Android Studio files..."
             
@@ -513,7 +489,6 @@ else
                 log_message "AVD directory found: $HOME/.android/avd"
                 log_message "AVD files will be preserved to maintain virtual device settings and data"
             fi
-            
         else
             # Interactive mode
             if [ -d "$HOME/.gradle/caches" ]; then
@@ -557,10 +532,39 @@ else
     fi
 fi
 
+# Subsection 4.7: iOS Simulator Cleanup
+if [ "$DRY_RUN" = true ]; then
+    log_message "DRY RUN: Would clean iOS Simulator caches and unused simulators"
+else
+    if command -v xcrun &>/dev/null; then
+        # Clean simulator caches
+        log_message "Cleaning iOS Simulator caches..."
+        rm -rf ~/Library/Developer/CoreSimulator/Caches/* 2>/dev/null || handle_error "Failed to clean simulator caches"
+        
+        # Remove unavailable simulators
+        log_message "Removing unavailable simulators..."
+        xcrun simctl delete unavailable 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to remove unavailable simulators"
+    else
+        log_message "xcrun command not found, skipping simulator cleanup"
+    fi
+fi
 
-# Section 12: XCode cleanup (추가 섹션)
-log_message "SECTION 12: Checking XCode related files"
+log_message "----------------------------------------"
 
+# Section 5: Application Cache Cleanup
+log_message "SECTION 5: Application Cache Cleanup"
+
+# Subsection 5.1: Check for large files in Application Support
+log_message "Checking for large files in Application Support..."
+large_app_support=$(find "$HOME/Library/Application Support" -type f -size +100M -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
+
+if [ -n "$large_app_support" ]; then
+    log_message "Found the following large files in Application Support:"
+    echo "$large_app_support" | tee -a "$LOG_FILE"
+    log_message "NOTE: These files may be important for your applications. Review manually before removing."
+fi
+
+# Subsection 5.2: XCode Cleanup
 if [ -d "$HOME/Library/Developer/Xcode" ]; then
     log_message "XCode detected. Checking for cleanable files..."
     
@@ -594,30 +598,63 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
             find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null
         fi
     fi
-    
-    # Check iOS Simulator caches
-    if [ -d "$HOME/Library/Developer/CoreSimulator" ]; then
-        simulator_size=$(du -sh "$HOME/Library/Developer/CoreSimulator" 2>/dev/null | awk '{print $1}')
-        log_message "iOS Simulator files size: $simulator_size"
-        
-        if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Delete unused iOS Simulators? (y/n): " simulator_clean && [[ "$simulator_clean" == "y" || "$simulator_clean" == "Y" ]]); then
-            if command -v xcrun &>/dev/null; then
-                log_message "Cleaning unused iOS Simulators..."
-                xcrun simctl delete unavailable 2>&1 | tee -a "$LOG_FILE"
-            else
-                log_message "xcrun command not found, skipping simulator cleanup"
-            fi
-        fi
-    fi
 else
     log_message "XCode not detected on this system"
 fi
 
-# Section 13: macOS specific cleanup
-log_message "SECTION 13: macOS specific cleanup"
+log_message "----------------------------------------"
 
-# Check and clean Language resources (careful with this)
-if [ "$DRY_RUN" = false ] && [[ "$1" == "--auto-clean" ]] || read -p "Would you like to check for unused language resources? (y/n): " lang_check && [[ "$lang_check" == "y" || "$lang_check" == "Y" ]]; then
+# Section 6: System Files Cleanup
+log_message "SECTION 6: System Files Cleanup"
+
+# Subsection 6.1: .DS_Store Files Cleanup
+log_message "Checking for .DS_Store files..."
+
+if [ "$DRY_RUN" = true ]; then
+    log_message "DRY RUN: Would scan for and count .DS_Store files"
+else
+    # Count and calculate size of all .DS_Store files with progress
+    total_found=0
+    total_size=0
+    
+    # Find all .DS_Store files with progress
+    while IFS= read -r -d '' file; do
+        total_found=$((total_found + 1))
+        file_size=$(du -k "$file" 2>/dev/null | cut -f1)
+        total_size=$((total_size + file_size))
+        
+        # Show progress every 100 files
+        if [ $((total_found % 100)) -eq 0 ]; then
+            log_message "Found $total_found .DS_Store files so far..."
+        fi
+    done < <(find "$HOME" -name ".DS_Store" -type f -print0 2>/dev/null)
+    
+    if [ "$total_found" -gt 0 ]; then
+        log_message "Found $total_found .DS_Store files, total size: $(numfmt --to=iec-i --suffix=B $((total_size * 1024)))"
+        
+        if [[ "$1" == "--auto-clean" ]]; then
+            log_message "Auto-cleaning .DS_Store files..."
+            find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null
+            log_message "Removed .DS_Store files"
+        else
+            read -p "Would you like to remove all .DS_Store files? (y/n): " ds_clean
+            if [[ "$ds_clean" == "y" || "$ds_clean" == "Y" ]]; then
+                log_message "Removing .DS_Store files..."
+                find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null
+                log_message "Removed .DS_Store files"
+            else
+                log_message "Skipping .DS_Store cleanup"
+            fi
+        fi
+    else
+        log_message "No .DS_Store files found"
+    fi
+fi
+
+# Subsection 6.2: macOS Language Resources
+if [ "$DRY_RUN" = true ]; then
+    log_message "DRY RUN: Would check for unused language resources"
+elif [[ "$1" == "--auto-clean" ]] || read -p "Would you like to check for unused language resources? (y/n): " lang_check && [[ "$lang_check" == "y" || "$lang_check" == "Y" ]]; then
     log_message "Checking for large language resource directories..."
     
     # Find top 10 largest localization directories
@@ -632,42 +669,19 @@ if [ "$DRY_RUN" = false ] && [[ "$1" == "--auto-clean" ]] || read -p "Would you 
     fi
 fi
 
-# Check for large files in Application Support
-log_message "Checking for large files in Application Support..."
-large_app_support=$(find "$HOME/Library/Application Support" -type f -size +100M -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
-
-if [ -n "$large_app_support" ]; then
-    log_message "Found the following large files in Application Support:"
-    echo "$large_app_support" | tee -a "$LOG_FILE"
-    log_message "NOTE: These files may be important for your applications. Review manually before removing."
-fi
-
-# Clear system caches if requested with sudo
-if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clear system caches (requires sudo)? (y/n): " syscache_clean && [[ "$syscache_clean" == "y" || "$syscache_clean" == "Y" ]]); then
-    log_message "WARNING: System cache cleaning may affect system performance temporarily"
-    log_message "Clearing system caches..."
-    sudo rm -rf /Library/Caches/* 2>/dev/null
-    sudo rm -rf /System/Library/Caches/* 2>/dev/null
-    log_message "System caches cleared"
-fi
-
-# Check for sleepimage file (can be very large)
-if [ -f "/private/var/vm/sleepimage" ]; then
-    sleepimage_size=$(du -sh "/private/var/vm/sleepimage" 2>/dev/null | awk '{print $1}')
-    log_message "Found sleepimage file, size: $sleepimage_size"
-    log_message "WARNING: Modifying sleepimage may affect system sleep functionality. Proceed with caution."
-fi
 log_message "----------------------------------------"
+
+# Section 7: Final Summary
+log_message "SECTION 7: Final Summary"
 
 # Calculate space saved
 FINAL_FREE_SPACE=$(df -k / | awk 'NR==2 {print $4}')
 SPACE_SAVED=$((FINAL_FREE_SPACE - INITIAL_FREE_SPACE))
-SPACE_SAVED_MB=$((SPACE_SAVED / 1024))
 
 # Check disk usage after cleanup
-log_message "Initial disk free space: $(numfmt --to=iec-i --suffix=B $((INITIAL_FREE_SPACE * 1024)))"
-log_message "Final disk free space: $(numfmt --to=iec-i --suffix=B $((FINAL_FREE_SPACE * 1024)))"
-log_message "Total space saved: $(numfmt --to=iec-i --suffix=B $((SPACE_SAVED * 1024)))"
+log_message "Initial disk free space: $(format_disk_space $((INITIAL_FREE_SPACE * 1024)))"
+log_message "Final disk free space: $(format_disk_space $((FINAL_FREE_SPACE * 1024)))"
+log_message "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
 
 log_message "========================================="
 log_message "System cleanup completed. Log saved to: $LOG_FILE"
@@ -675,7 +689,7 @@ log_message "System cleanup completed. Log saved to: $LOG_FILE"
 # Provide some user guidance
 echo ""
 echo "Cleanup process completed!"
-echo "Total space saved: $(numfmt --to=iec-i --suffix=B $((SPACE_SAVED * 1024)))"
+echo "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
 echo ""
 echo "For additional manual cleanup, consider:"
 echo "1. Emptying the Trash (rm -rf ~/.Trash/*)"
@@ -687,6 +701,7 @@ echo ""
 echo "For additional options, run: $0 --help"
 echo "Log file saved to: $LOG_FILE"
 
+# Final system checks
 if pgrep -x "Xcode" > /dev/null; then
     log_message "WARNING: XCode is running. Please close XCode before cleaning."
     exit 1
