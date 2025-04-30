@@ -115,60 +115,71 @@ To run the script automatically on a schedule, you can use `crontab`:
 - Creates a log directory (`~/logs`) if it doesn't exist
 - Generates timestamped log files for each run
 - Implements error handling and message logging functions
+- Enhanced error handling and logging message system
 
 ### 2. Disk Usage Check
 
 - Reports current disk usage at the beginning of the script
 - Provides baseline metrics for comparison after cleanup
+- Enhanced disk space calculation and display logic
+- Support for various units (GB, MB, KB, B)
 
-### 3. Cache Size Check
+### 3. Permission Check System
+
+- System library cache cleanup permission checks
+- System log cleanup permission checks
+- User library cache cleanup permission checks
+- Temporary file cleanup permission checks
+- Safe task skipping when permissions are insufficient
+
+### 4. Cache Size Check
 
 - Examines `~/Library/Caches` size
 - Reports Downloads folder size
 - Identifies potential large space consumers
 
-### 4. Homebrew Cleanup
+### 5. Homebrew Cleanup
 
 - Updates Homebrew package listings
 - Identifies outdated packages
 - Checks for unused dependencies
 - Cleans up old versions and cache files
 
-### 5. npm Cache Cleanup
+### 6. npm Cache Cleanup
 
 - Checks if npm is installed
 - Reports cache size before cleaning
 - Performs cache cleanup
 - Reports space saved after cleaning
 
-### 6. System Log Check
+### 7. System Log Check
 
 - Reports the size of system log files
 - Requires sudo access for complete information
 
-### 7. Docker Cleanup (Optional)
+### 8. Docker Cleanup (Optional)
 
 - Checks if Docker is installed
 - Reports Docker disk usage
 - Offers interactive option to clean up unused Docker resources
 - Includes dangling images, stopped containers, and unused networks
 
-### 8. node_modules Directory Cleanup
+### 9. node_modules Directory Cleanup
 
 - Find and report large node_modules directories
 - Identify old projects and suggest manual cleanup
 
-### 9. Yarn Cache Cleanup
+### 10. Yarn Cache Cleanup
 
 - Check and clean Yarn cache size
 - Report cleanup results
 
-### 10. .DS_Store File Cleanup
+### 11. .DS_Store File Cleanup
 
 - Find and count .DS_Store files
 - Provide optional cleanup
 
-### 11. Android Studio File Cleanup
+### 12. Android Studio File Cleanup
 
 - Check for Android Studio installation
 - Clean Gradle caches and SDK temporary files
@@ -176,7 +187,7 @@ To run the script automatically on a schedule, you can use `crontab`:
 - Analyze build directories and suggest manual cleanup
 - Identify outdated SDK packages
 
-### 12. Summary Report
+### 13. Summary Report
 
 - Reports final disk usage after all cleanup operations
 - Provides comparison with initial state
@@ -269,11 +280,29 @@ Android Studio cleanup might affect virtual device settings.
 ERROR: Permission denied
 ```
 
-**Solution**: Ensure the script has execution permissions:
+**Solution**:
+
+- Ensure the script has execution permissions:
+  ```
+  chmod +x system_cleanup.sh
+  ```
+- Verify read/write permissions for required directories
+- Grant appropriate permissions for tasks requiring sudo
+
+### Disk Space Calculation Error
 
 ```
-chmod +x system_cleanup.sh
+ERROR: Unable to calculate disk space
 ```
+
+**Solution**:
+
+- Verify that required commands for disk space calculation are installed
+- Check disk mount status
+- If needed, check disk space manually:
+  ```
+  df -h
+  ```
 
 ### Homebrew Update Fails
 
@@ -305,12 +334,15 @@ Could not access system logs (sudo may be required)
 
 - The script only requires elevated permissions for reading system logs
 - No system modifications are made with sudo privileges
+- Proper permission checks before all cleanup operations
+- Designed to safely skip tasks when permissions are insufficient
 
 ### Data Safety
 
 - Only known cache directories and temporary files are cleaned
 - User data directories are not modified
-- Interactive confirmation is required for potentially destructive operations (Docker cleanup)
+- Interactive confirmation is required for potentially destructive operations
+- Safety mechanisms to prevent data damage when permission checks fail
 
 ### Log File Security
 
@@ -347,3 +379,12 @@ This script is released under the MIT License. See the LICENSE file for details.
 - v1.2 (2023-06-10): Added node_modules and Yarn cache cleanup
 - v1.3 (2023-07-15): Added .DS_Store file cleanup feature
 - v2.0 (2025-04-14): Added Android Studio cleanup feature, implemented AVD file protection
+- v2.1 (2025-04-30):
+  - Improved permission checking system
+  - Added system library cache cleanup permission checks
+  - Added system log cleanup permission checks
+  - Added user library cache cleanup permission checks
+  - Added temporary file cleanup permission checks
+  - Enhanced disk space calculation logic
+  - Improved disk space display units
+  - Enhanced error handling and logging messages
