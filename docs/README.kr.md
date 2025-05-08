@@ -1,5 +1,7 @@
 # System Cleanup Utility
 
+[View in English](README.md) | [한국어 문서 보기](README.kr.md)
+
 ## 개요
 
 이 프로젝트는 macOS 시스템의 유지보수와 최적화를 위한 두 가지 주요 스크립트를 제공합니다:

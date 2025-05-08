@@ -1,5 +1,7 @@
 # System Cleanup Utility
 
+[한국어 문서 보기](README.kr.md) | [View in English](README.md)
+
 ## Overview
 
 This project provides two main scripts for macOS system maintenance and optimization:
