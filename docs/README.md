@@ -2,9 +2,172 @@
 
 ## Overview
 
-`system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system, including package managers, caches, and system logs.
+This project provides two main scripts for macOS system maintenance and optimization:
+
+1. `system_cleanup.sh`: System cleanup and optimization
+2. `system_upgrade.sh`: System and application update management
+
+## System Upgrade Utility
+
+### Overview
+
+`system_upgrade.sh` is an automated upgrade script designed to keep your macOS system's packages and applications up to date. This script manages updates for Homebrew, Cask, and the entire system.
+
+### Key Features
+
+- Automatic Homebrew and Cask updates
+- Full system updates via topgrade
+- Automatic detection and installation of Homebrew Cask-compatible apps
+- Detailed logging system
+- Error handling and recovery mechanisms
+- Automatic temporary file management
+
+### Installation
+
+#### Prerequisites
+
+- macOS operating system
+- Bash shell
+- Homebrew package manager
+- Internet connection
+
+#### Setup Instructions
+
+1. Download the script to your preferred location:
+
+   ```
+   curl -o ~/src/system_upgrade.sh https://your-repository-url/system_upgrade.sh
+   ```
+
+2. Make the script executable:
+
+   ```
+   chmod +x ~/src/system_upgrade.sh
+   ```
+
+3. (Optional) Create a symbolic link to make it accessible system-wide:
+   ```
+   sudo ln -s ~/src/system_upgrade.sh /usr/local/bin/system_upgrade
+   ```
+
+### Usage
+
+#### Basic Usage
+
+Run the script from your terminal:
+
+```
+./system_upgrade.sh
+```
+
+Or if you created the symbolic link:
+
+```
+system_upgrade
+```
+
+### Script Sections Explained
+
+#### 1. Initial Setup
+
+- Temporary directory creation
+- Logging system initialization
+- Error handling configuration
+
+#### 2. Homebrew Update
+
+- Homebrew package manager update
+- Homebrew Cask update
+- Error handling for update failures
+
+#### 3. topgrade Execution
+
+- topgrade installation check
+- Automatic installation if needed
+- Full system update execution
+
+#### 4. App Search and Installation
+
+- /Applications directory scanning
+- Detection of Homebrew Cask-compatible apps
+- Version information verification
+- Installation after user confirmation
+
+### Log Files
+
+All operations are logged to files in the `/tmp/brew_replace` directory. The log file includes:
+
+- Timestamp for each operation
+- System command output
+- Error messages (if any)
+- Installed app information
+
+### Troubleshooting
+
+#### Homebrew Update Failure
+
+```
+ERROR: Failed to update Homebrew
+```
+
+**Solution**:
+
+- Check internet connection
+- Try manual Homebrew update:
+  ```
+  brew update
+  ```
+
+#### topgrade Installation Failure
+
+```
+ERROR: Failed to install topgrade
+```
+
+**Solution**:
+
+- Check Homebrew status:
+  ```
+  brew doctor
+  ```
+- Install topgrade manually:
+  ```
+  brew install topgrade
+  ```
+
+#### Permission Errors
+
+```
+ERROR: Permission denied
+```
+
+**Solution**:
+
+- Verify script execution permissions:
+  ```
+  chmod +x system_upgrade.sh
+  ```
+- Check access permissions for required directories
+
+### Security Considerations
+
+- The script does not use sudo privileges for system modifications
+- All installation operations are performed with user privileges
+- Temporary files are automatically cleaned up
+- Sensitive system files are not modified
+
+### Automation
+
+To run the script regularly, you can use crontab:
+
+```
+# Run every Sunday at midnight
+0 0 * * 0 /path/to/system_upgrade.sh
+```
 
 ## Features
+
+`system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system, including package managers, caches, and system logs.
 
 - Disk usage analysis and reporting
 - Homebrew package management and cleanup

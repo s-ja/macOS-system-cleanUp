@@ -2,6 +2,171 @@
 
 ## 개요
 
+이 프로젝트는 macOS 시스템의 유지보수와 최적화를 위한 두 가지 주요 스크립트를 제공합니다:
+
+1. `system_cleanup.sh`: 시스템 정리 및 최적화
+2. `system_upgrade.sh`: 시스템 및 앱 업데이트 관리
+
+## 시스템 업그레이드 유틸리티
+
+### 개요
+
+`system_upgrade.sh`는 macOS 시스템의 패키지와 애플리케이션을 최신 상태로 유지하기 위한 자동화된 업그레이드 스크립트입니다. 이 스크립트는 Homebrew, Cask, 그리고 시스템 전체의 업데이트를 관리합니다.
+
+### 주요 기능
+
+- Homebrew 및 Cask 자동 업데이트
+- topgrade를 통한 전체 시스템 업데이트
+- Homebrew Cask로 설치 가능한 앱 자동 감지 및 설치
+- 상세한 로깅 시스템
+- 에러 처리 및 복구 메커니즘
+- 임시 파일 자동 관리
+
+### 설치
+
+#### 필수 조건
+
+- macOS 운영 체제
+- Bash 쉘
+- Homebrew 패키지 관리자
+- 인터넷 연결
+
+#### 설치 방법
+
+1. 스크립트를 원하는 위치에 다운로드하세요:
+
+   ```
+   curl -o ~/src/system_upgrade.sh https://your-repository-url/system_upgrade.sh
+   ```
+
+2. 스크립트를 실행 가능하게 만드세요:
+
+   ```
+   chmod +x ~/src/system_upgrade.sh
+   ```
+
+3. (선택 사항) 시스템 전체에서 접근할 수 있도록 심볼릭 링크를 생성하세요:
+   ```
+   sudo ln -s ~/src/system_upgrade.sh /usr/local/bin/system_upgrade
+   ```
+
+### 사용 방법
+
+#### 기본 사용법
+
+터미널에서 스크립트를 실행하세요:
+
+```
+./system_upgrade.sh
+```
+
+또는 심볼릭 링크를 생성한 경우:
+
+```
+system_upgrade
+```
+
+### 스크립트 섹션 설명
+
+#### 1. 초기 설정
+
+- 임시 디렉토리 생성
+- 로깅 시스템 초기화
+- 에러 처리 설정
+
+#### 2. Homebrew 업데이트
+
+- Homebrew 패키지 관리자 업데이트
+- Homebrew Cask 업데이트
+- 업데이트 실패 시 에러 처리
+
+#### 3. topgrade 실행
+
+- topgrade 설치 확인
+- 필요한 경우 자동 설치
+- 전체 시스템 업데이트 수행
+
+#### 4. 앱 검색 및 설치
+
+- /Applications 디렉토리 스캔
+- Homebrew Cask로 설치 가능한 앱 감지
+- 버전 정보 확인
+- 사용자 확인 후 설치
+
+### 로그 파일
+
+모든 작업은 `/tmp/brew_replace` 디렉토리에 있는 로그 파일에 기록됩니다. 로그 파일에는 다음이 포함됩니다:
+
+- 각 작업에 대한 타임스탬프
+- 시스템 명령 출력
+- 에러 메시지(있는 경우)
+- 설치된 앱 정보
+
+### 문제 해결
+
+#### Homebrew 업데이트 실패
+
+```
+ERROR: Failed to update Homebrew
+```
+
+**해결책**:
+
+- 인터넷 연결 확인
+- Homebrew 수동 업데이트 시도:
+  ```
+  brew update
+  ```
+
+#### topgrade 설치 실패
+
+```
+ERROR: Failed to install topgrade
+```
+
+**해결책**:
+
+- Homebrew 상태 확인:
+  ```
+  brew doctor
+  ```
+- 수동으로 topgrade 설치:
+  ```
+  brew install topgrade
+  ```
+
+#### 권한 오류
+
+```
+ERROR: Permission denied
+```
+
+**해결책**:
+
+- 스크립트 실행 권한 확인:
+  ```
+  chmod +x system_upgrade.sh
+  ```
+- 필요한 디렉토리에 대한 접근 권한 확인
+
+### 보안 고려 사항
+
+- 스크립트는 시스템 수정을 위해 sudo 권한을 사용하지 않습니다
+- 모든 설치 작업은 사용자 권한으로 수행됩니다
+- 임시 파일은 자동으로 정리됩니다
+- 민감한 시스템 파일은 수정하지 않습니다
+
+### 자동화
+
+스크립트를 정기적으로 실행하려면 crontab을 사용할 수 있습니다:
+
+```
+# 매주 일요일 자정에 실행
+0 0 * * 0 /path/to/system_upgrade.sh
+```
+
+## 개요
+
 `system_cleanup.sh`는 macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지하기 위해 설계된 자동화된 유지보수 스크립트입니다. 이 스크립트는 패키지 관리자, 캐시, 시스템 로그 등 시스템의 다양한 부분에 대한 일련의 정리 작업을 수행합니다.
 
 ## 주요 기능
