@@ -129,38 +129,58 @@ if [ "$DRY_RUN" = true ]; then
 else
     # System library cache cleanup
     log_message "Checking system library cache cleanup permissions..."
-    if [ "$(id -u)" = "0" ]; then
+    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
         log_message "Cleaning system library caches..."
-        rm -rf /Library/Caches/* 2>/dev/null || log_message "Skipping system library cache cleanup due to permission restrictions"
+        if sudo rm -rf /Library/Caches/* 2>/dev/null; then
+            log_message "Successfully cleaned system library caches"
+        else
+            handle_error "Failed to clean system library caches"
+        fi
     else
         log_message "Skipping system library cache cleanup - requires root privileges"
+        log_message "To enable this feature, run the script with sudo or enter your password when prompted"
     fi
     
     # System logs cleanup
     log_message "Checking system logs cleanup permissions..."
-    if [ "$(id -u)" = "0" ]; then
+    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
         log_message "Cleaning system logs..."
-        rm -rf /var/log/* 2>/dev/null || log_message "Skipping system logs cleanup due to permission restrictions"
+        # 보존해야 할 중요한 로그 파일들
+        if sudo find /var/log -type f -not -name "system.log" -not -name "secure.log" -not -name "auth.log" -delete 2>/dev/null; then
+            log_message "Successfully cleaned system logs (preserving critical logs)"
+        else
+            handle_error "Failed to clean system logs"
+        fi
     else
         log_message "Skipping system logs cleanup - requires root privileges"
+        log_message "To enable this feature, run the script with sudo or enter your password when prompted"
     fi
     
     # User library cache cleanup
     log_message "Checking user library cache cleanup permissions..."
     if [ -w "$HOME/Library/Caches" ]; then
         log_message "Cleaning user library caches..."
-        rm -rf ~/Library/Caches/* 2>/dev/null || log_message "Skipping user library cache cleanup due to permission restrictions"
+        if rm -rf ~/Library/Caches/* 2>/dev/null; then
+            log_message "Successfully cleaned user library caches"
+        else
+            handle_error "Failed to clean user library caches"
+        fi
     else
         log_message "Skipping user library cache cleanup - insufficient permissions"
     fi
     
     # Temporary items cleanup
     log_message "Checking temporary items cleanup permissions..."
-    if [ -w "$HOME/Library/TemporaryItems" ]; then
+    if [ -w "$HOME/Library/TemporaryItems" ] || sudo -n true 2>/dev/null; then
         log_message "Cleaning temporary items..."
-        rm -rf ~/Library/TemporaryItems/* 2>/dev/null || log_message "Skipping temporary items cleanup due to permission restrictions"
+        if sudo rm -rf ~/Library/TemporaryItems/* 2>/dev/null; then
+            log_message "Successfully cleaned temporary items"
+        else
+            handle_error "Failed to clean temporary items"
+        fi
     else
         log_message "Skipping temporary items cleanup - insufficient permissions"
+        log_message "To enable this feature, run the script with sudo or enter your password when prompted"
     fi
 fi
 
@@ -181,14 +201,28 @@ else
             log_message "Found the following local snapshots:"
             echo "$local_snapshots" | tee -a "$LOG_FILE"
             
+            # Check if we have sudo privileges
+            if ! sudo -n true 2>/dev/null; then
+                log_message "WARNING: sudo privileges required for removing local snapshots"
+                log_message "Please run the script with sudo or enter your password when prompted"
+            fi
+            
             if [[ "$1" == "--auto-clean" ]]; then
                 log_message "Auto-cleaning local snapshots..."
-                sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean local snapshots"
+                if sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE"; then
+                    log_message "Successfully removed local snapshots"
+                else
+                    handle_error "Failed to remove local snapshots - sudo privileges may be required"
+                fi
             else
                 read -p "Would you like to remove local snapshots? (y/n): " remove_snapshots
                 if [[ "$remove_snapshots" == "y" || "$remove_snapshots" == "Y" ]]; then
                     log_message "Removing local snapshots..."
-                    sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean local snapshots"
+                    if sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE"; then
+                        log_message "Successfully removed local snapshots"
+                    else
+                        handle_error "Failed to remove local snapshots - sudo privileges may be required"
+                    fi
                 else
                     log_message "Skipping local snapshots cleanup"
                 fi
@@ -270,30 +304,62 @@ else
             log_message "npm cache size before cleaning: $npm_cache_size_before"
             
             if [ "$DRY_RUN" = true ]; then
-                # Dry run mode
                 log_message "DRY RUN: Would clean npm cache"
-                
-                # Show what would be removed
-                npm_cache_size=$(du -sh "$npm_cache_dir" 2>/dev/null | awk '{print $1}')
-                log_message "DRY RUN: Would free approximately $npm_cache_size"
+                log_message "DRY RUN: Would free approximately $npm_cache_size_before"
             else
-                # Clean npm cache
+                # Clean npm cache with verification
                 log_message "Cleaning npm cache..."
-                npm cache clean --force 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean npm cache"
-                
-                # Get npm cache size after cleaning
-                npm_cache_size_after=$(du -sh "$npm_cache_dir" 2>/dev/null | awk '{print $1}')
-                log_message "npm cache size after cleaning: $npm_cache_size_after"
+                if npm cache clean --force 2>&1 | tee -a "$LOG_FILE"; then
+                    # Verify cache was actually cleaned
+                    npm_cache_size_after=$(du -sh "$npm_cache_dir" 2>/dev/null | awk '{print $1}')
+                    log_message "npm cache size after cleaning: $npm_cache_size_after"
+                    
+                    if [ "$npm_cache_size_after" = "$npm_cache_size_before" ]; then
+                        log_message "WARNING: npm cache size did not change. This might indicate a permission issue."
+                    fi
+                else
+                    handle_error "Failed to clean npm cache"
+                fi
                 
                 # Check for global packages and prune if auto-clean is enabled
                 if [[ "$1" == "--auto-clean" ]]; then
-                    log_message "Checking for outdated global npm packages..."
+                    log_message "Checking for outdated and unused global npm packages..."
+                    
+                    # Get list of global packages
+                    global_packages=$(npm list -g --depth=0 2>/dev/null)
+                    
+                    # Check for outdated packages
                     npm_outdated=$(npm outdated -g 2>/dev/null)
                     if [ -n "$npm_outdated" ]; then
-                        log_message "Pruning outdated global npm packages..."
-                        npm prune -g 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to prune npm packages"
+                        log_message "Found outdated global packages:"
+                        echo "$npm_outdated" | tee -a "$LOG_FILE"
+                        
+                        # Ask for confirmation before removing outdated packages
+                        read -p "Would you like to update outdated global packages? (y/n): " update_global
+                        if [[ "$update_global" == "y" || "$update_global" == "Y" ]]; then
+                            log_message "Updating outdated global packages..."
+                            if npm update -g 2>&1 | tee -a "$LOG_FILE"; then
+                                log_message "Successfully updated global packages"
+                            else
+                                handle_error "Failed to update global packages"
+                            fi
+                        fi
                     else
-                        log_message "No outdated global npm packages found"
+                        log_message "No outdated global packages found"
+                    fi
+                    
+                    # Check for unused packages
+                    log_message "Checking for unused global packages..."
+                    if npm prune -g --dry-run 2>&1 | tee -a "$LOG_FILE"; then
+                        read -p "Would you like to remove unused global packages? (y/n): " prune_global
+                        if [[ "$prune_global" == "y" || "$prune_global" == "Y" ]]; then
+                            log_message "Removing unused global packages..."
+                            if npm prune -g 2>&1 | tee -a "$LOG_FILE"; then
+                                log_message "Successfully removed unused global packages"
+                            else
+                                handle_error "Failed to remove unused global packages"
+                            fi
+                        fi
                     fi
                 fi
             fi
@@ -465,13 +531,21 @@ else
             # Clean Gradle cache - only files older than 30 days
             if [ -d "$HOME/.gradle/caches" ]; then
                 log_message "Cleaning Gradle cache files older than 30 days..."
-                find "$HOME/.gradle/caches" -type f -atime +30 -delete 2>/dev/null
+                if find "$HOME/.gradle/caches" -type f -atime +30 -delete 2>/dev/null; then
+                    log_message "Successfully cleaned Gradle cache files"
+                else
+                    handle_error "Failed to clean Gradle cache files"
+                fi
             fi
             
             # Clean Android SDK temp files - these are safe to remove
             if [ -d "$HOME/Library/Android/sdk/temp" ]; then
                 log_message "Cleaning Android SDK temp files..."
-                rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null
+                if rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null; then
+                    log_message "Successfully cleaned Android SDK temp files"
+                else
+                    handle_error "Failed to clean Android SDK temp files"
+                fi
             fi
             
             # Note: We're NOT auto-cleaning AVD files as requested
@@ -575,7 +649,11 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
         
         if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clean XCode DerivedData? (y/n): " xcode_clean && [[ "$xcode_clean" == "y" || "$xcode_clean" == "Y" ]]); then
             log_message "Cleaning XCode DerivedData..."
-            rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null
+            if rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null; then
+                log_message "Successfully cleaned XCode DerivedData"
+            else
+                handle_error "Failed to clean XCode DerivedData"
+            fi
         fi
     fi
     
@@ -595,7 +673,11 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
         
         if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clean old XCode Archives (older than 90 days)? (y/n): " archives_clean && [[ "$archives_clean" == "y" || "$archives_clean" == "Y" ]]); then
             log_message "Cleaning XCode Archives older than 90 days..."
-            find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null
+            if find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null; then
+                log_message "Successfully cleaned old XCode Archives"
+            else
+                handle_error "Failed to clean old XCode Archives"
+            fi
         fi
     fi
 else
@@ -634,14 +716,20 @@ else
         
         if [[ "$1" == "--auto-clean" ]]; then
             log_message "Auto-cleaning .DS_Store files..."
-            find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null
-            log_message "Removed .DS_Store files"
+            if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
+                log_message "Successfully removed .DS_Store files"
+            else
+                handle_error "Failed to remove .DS_Store files"
+            fi
         else
             read -p "Would you like to remove all .DS_Store files? (y/n): " ds_clean
             if [[ "$ds_clean" == "y" || "$ds_clean" == "Y" ]]; then
                 log_message "Removing .DS_Store files..."
-                find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null
-                log_message "Removed .DS_Store files"
+                if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
+                    log_message "Successfully removed .DS_Store files"
+                else
+                    handle_error "Failed to remove .DS_Store files"
+                fi
             else
                 log_message "Skipping .DS_Store cleanup"
             fi

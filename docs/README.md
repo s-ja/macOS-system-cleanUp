@@ -35,22 +35,27 @@ This project provides two main scripts for macOS system maintenance and optimiza
 
 #### Setup Instructions
 
-1. Download the script to your preferred location:
+1. Clone the repository from GitHub:
 
    ```
-   curl -o ~/src/system_upgrade.sh https://your-repository-url/system_upgrade.sh
+   git clone https://github.com/your-username/macos-system-cleanup.git
+   cd macos-system-cleanup
    ```
 
-2. Make the script executable:
+2. Make the scripts executable:
 
    ```
-   chmod +x ~/src/system_upgrade.sh
+   chmod +x src/system_upgrade.sh
+   chmod +x src/system_cleanup.sh
    ```
 
-3. (Optional) Create a symbolic link to make it accessible system-wide:
+3. (Optional) Create symbolic links to make them accessible system-wide:
    ```
-   sudo ln -s ~/src/system_upgrade.sh /usr/local/bin/system_upgrade
+   sudo ln -s $(pwd)/src/system_upgrade.sh /usr/local/bin/system_upgrade
+   sudo ln -s $(pwd)/src/system_cleanup.sh /usr/local/bin/system_cleanup
    ```
+
+> **Note**: When cloning from GitHub, file permissions may be reset. Make sure to grant execution permissions using the `chmod` command.
 
 ### Usage
 
@@ -197,24 +202,27 @@ To run the script regularly, you can use crontab:
 
 ### Setup Instructions
 
-1. Download the script to your preferred location:
+1. Clone the repository from GitHub:
 
    ```
-   curl -o ~/src/system_cleanup.sh https://your-repository-url/system_cleanup.sh
+   git clone https://github.com/your-username/macos-system-cleanup.git
+   cd macos-system-cleanup
    ```
 
-   Or simply create the file manually using a text editor.
-
-2. Make the script executable:
+2. Make the scripts executable:
 
    ```
-   chmod +x ~/src/system_cleanup.sh
+   chmod +x src/system_upgrade.sh
+   chmod +x src/system_cleanup.sh
    ```
 
-3. (Optional) Create a symbolic link to make it accessible system-wide:
+3. (Optional) Create symbolic links to make them accessible system-wide:
    ```
-   sudo ln -s ~/src/system_cleanup.sh /usr/local/bin/system_cleanup
+   sudo ln -s $(pwd)/src/system_upgrade.sh /usr/local/bin/system_upgrade
+   sudo ln -s $(pwd)/src/system_cleanup.sh /usr/local/bin/system_cleanup
    ```
+
+> **Note**: When cloning from GitHub, file permissions may be reset. Make sure to grant execution permissions using the `chmod` command.
 
 ## Usage
 
@@ -314,13 +322,18 @@ To run the script automatically on a schedule, you can use `crontab`:
 
 - Checks if npm is installed
 - Reports cache size before cleaning
-- Performs cache cleanup
+- Performs cache cleanup with verification
 - Reports space saved after cleaning
+- Checks for outdated and unused global packages
+- Provides interactive options for package updates and cleanup
+- Verifies cache cleaning success and warns about permission issues
 
 ### 7. System Log Check
 
 - Reports the size of system log files
 - Requires sudo access for complete information
+- Preserves critical system logs (system.log, secure.log, auth.log)
+- Provides clear feedback about permission requirements
 
 ### 8. Docker Cleanup (Optional)
 
@@ -553,3 +566,10 @@ This script is released under the MIT License. See the LICENSE file for details.
   - Enhanced disk space calculation logic
   - Improved disk space display units
   - Enhanced error handling and logging messages
+- v2.2 (2025-05-09):
+  - Enhanced npm cache cleanup with verification
+  - Added global package management features
+  - Improved permission handling for system operations
+  - Added critical system log preservation
+  - Enhanced error reporting and user feedback
+  - Added verification steps for cleanup operations
