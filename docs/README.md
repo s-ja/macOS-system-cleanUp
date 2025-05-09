@@ -172,6 +172,20 @@ To run the script regularly, you can use crontab:
 0 0 * * 0 /path/to/system_upgrade.sh
 ```
 
+### Version History
+
+- v1.0 (2023-05-20): Initial release
+- v1.1 (2023-05-25): Added Homebrew Cask update functionality
+- v1.2 (2023-06-10): Integrated topgrade and auto-installation
+- v1.3 (2023-07-15): Added automatic app detection and installation
+- v2.0 (2025-04-14): Improved logging system and error handling
+- v2.1 (2025-04-30): Enhanced permission checking and temporary file management
+- v2.2 (2025-05-09):
+  - Added Homebrew update verification steps
+  - Added retry logic for Cask installation failures
+  - Improved permission requirement feedback
+  - Enhanced error reporting and user feedback
+
 ## Features
 
 `system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system, including package managers, caches, and system logs.
@@ -552,11 +566,27 @@ This script is released under the MIT License. See the LICENSE file for details.
 
 ## Version History
 
+### System Upgrade Utility (system_upgrade.sh)
+
+- v1.0 (2023-05-20): Initial release
+- v1.1 (2023-05-25): Added Homebrew Cask update functionality
+- v1.2 (2023-06-10): Integrated topgrade and auto-installation
+- v1.3 (2023-07-15): Added automatic app detection and installation
+- v2.0 (2025-04-14): Improved logging system and error handling
+- v2.1 (2025-04-30): Enhanced permission checking and temporary file management
+- v2.2 (2025-05-09):
+  - Added Homebrew update verification steps
+  - Added retry logic for Cask installation failures
+  - Improved permission requirement feedback
+  - Enhanced error reporting and user feedback
+
+### System Cleanup Utility (system_cleanup.sh)
+
 - v1.0 (2023-05-20): Initial release
 - v1.1 (2023-05-25): Added Docker cleanup, improved logging
 - v1.2 (2023-06-10): Added node_modules and Yarn cache cleanup
 - v1.3 (2023-07-15): Added .DS_Store file cleanup feature
-- v2.0 (2025-04-14): Added Android Studio cleanup feature, implemented AVD file protection
+- v2.0 (2025-04-14): Added Android Studio cleanup, implemented AVD file protection
 - v2.1 (2025-04-30):
   - Improved permission checking system
   - Added system library cache cleanup permission checks
