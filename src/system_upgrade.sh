@@ -3,7 +3,7 @@
 # 에러 발생 시 스크립트 중단
 set -e
 
-# 임시 파일 경로 설정
+# 강제로 /tmp 사용 (폴백 로직 제거)
 TEMP_DIR="/tmp/brew_replace"
 INSTALLED_APPS="$TEMP_DIR/apps_installed.txt"
 AVAILABLE_CASKS="$TEMP_DIR/casks_available.txt"
@@ -20,13 +20,20 @@ handle_error() {
     exit 1
 }
 
-# 임시 디렉토리 생성
-if ! mkdir -p "$TEMP_DIR"; then
-    handle_error "임시 디렉토리 생성 실패"
-fi
+# 디렉토리 생성 (실패 시 즉시 종료)
+mkdir -p "$TEMP_DIR" || {
+    echo "🛑 FATAL: /tmp 디렉토리 생성 실패. 수동 조치 필요:"
+    echo "1. sudo mkdir -p /tmp/brew_replace"
+    echo "2. sudo chown $(whoami) /tmp/brew_replace"
+    exit 1
+}
 
 # 로그 파일 초기화
-> "$LOG_FILE"
+touch "$LOG_FILE" || {
+    echo "🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요:"
+    echo "chmod 700 /tmp/brew_replace"
+    exit 1
+}
 
 # Homebrew 업데이트
 log "Homebrew 업데이트를 시작합니다..."
@@ -114,7 +121,19 @@ else
     log "Homebrew Cask로 설치 가능한 새로운 앱이 없습니다."
 fi
 
-# 임시 파일 정리
-rm -rf "$TEMP_DIR"
+# 임시 파일 정리 (명시적 삭제)
+cleanup() {
+    if [ -d "$TEMP_DIR" ]; then
+        rm -rf "$TEMP_DIR" && echo "✅ 임시 파일 정리 완료"
+    fi
+}
+trap cleanup EXIT
 
 log "모든 업데이트가 완료되었습니다."
+
+RUBY_VERSION=$(ruby -v | awk '{print $2}')
+if [[ "$(printf '%s\n' "3.2.0" "$RUBY_VERSION" | sort -V | head -n1)" != "3.2.0" ]]; then
+    log "⚠️ 경고: 현재 Ruby 버전 ($RUBY_VERSION)이 일부 gem 요구사항(3.2.0+)을 충족하지 않습니다."
+    log "  1. Ruby 업그레이드: brew upgrade ruby"
+    log "  2. 이전 버전 설치: gem install erb -v 4.0.0 && gem install typeprof -v 0.20.0"
+fi

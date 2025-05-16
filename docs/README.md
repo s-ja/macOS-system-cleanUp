@@ -185,6 +185,12 @@ To run the script regularly, you can use crontab:
   - Added retry logic for Cask installation failures
   - Improved permission requirement feedback
   - Enhanced error reporting and user feedback
+- v2.3 (2025-05-20):
+  - Enforced strict /tmp directory usage
+  - Added Ruby version compatibility checks
+  - Implemented enhanced permission validation
+  - Removed home directory fallback logic
+  - Improved error messages with solution guides
 
 ## Features
 
@@ -520,6 +526,42 @@ Could not access system logs (sudo may be required)
 
 **Solution**: Press Ctrl+C to skip Docker cleanup and continue with the rest of the script.
 
+### Ruby Gem Installation Errors
+
+```bash
+ERROR: Error installing erb/typeprof: requires Ruby version >= X.X
+```
+
+**Solutions**:
+
+1. Check current Ruby version:
+   ```bash
+   ruby -v
+   ```
+2. Upgrade Ruby (recommended):
+   ```bash
+   brew upgrade ruby && source ~/.zshrc
+   ```
+3. Use version manager (alternative):
+   ```bash
+   rbenv install 3.2.0
+   rbenv global 3.2.0
+   ```
+
+### Permission Issues
+
+```bash
+ERROR: Cannot create /tmp/brew_replace
+```
+
+**Solutions**:
+
+```bash
+sudo mkdir -p /tmp/brew_replace
+sudo chown $(whoami) /tmp/brew_replace
+chmod 700 /tmp/brew_replace
+```
+
 ## Security Considerations
 
 ### Permissions
@@ -579,6 +621,12 @@ This script is released under the MIT License. See the LICENSE file for details.
   - Added retry logic for Cask installation failures
   - Improved permission requirement feedback
   - Enhanced error reporting and user feedback
+- v2.3 (2025-05-20):
+  - Enforced strict /tmp directory usage
+  - Added Ruby version compatibility checks
+  - Implemented enhanced permission validation
+  - Removed home directory fallback logic
+  - Improved error messages with solution guides
 
 ### System Cleanup Utility (system_cleanup.sh)
 
@@ -603,3 +651,27 @@ This script is released under the MIT License. See the LICENSE file for details.
   - Added critical system log preservation
   - Enhanced error reporting and user feedback
   - Added verification steps for cleanup operations
+
+### Known Issues
+
+#### Ruby Version Compatibility
+
+- Ruby ≥ 3.2.0 required
+- Solutions:
+  ```bash
+  brew upgrade ruby
+  # OR
+  gem install PACKAGE -v COMPATIBLE_VERSION
+  ```
+
+#### Temporary File Policy (v2.3+)
+
+- Strict /tmp directory usage
+  ```bash
+  # If permission issues occur
+  sudo mkdir -p /tmp/brew_replace
+  sudo chown $(whoami) /tmp/brew_replace
+  chmod 700 /tmp/brew_replace
+  ```
+- Guaranteed cleanup
+- Enhanced permission validation

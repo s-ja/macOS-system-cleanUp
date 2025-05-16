@@ -185,6 +185,12 @@ ERROR: Permission denied
   - Cask 설치 실패 시 재시도 로직 추가
   - 권한 요구사항에 대한 명확한 피드백 제공
   - 오류 보고 및 사용자 피드백 개선
+- v2.3 (2025-05-20):
+  - /tmp 디렉토리 전용 사용 강제화
+  - Ruby 버전 호환성 검사 추가
+  - 강화된 권한 검증 시스템 구현
+  - 홈 디렉토리 폴백 로직 제거
+  - 해결 방법 포함된 오류 메시지 개선
 
 ## 개요
 
@@ -580,6 +586,12 @@ ERROR: Failed to clean Gradle cache
   - Cask 설치 실패 시 재시도 로직 추가
   - 권한 요구사항에 대한 명확한 피드백 제공
   - 오류 보고 및 사용자 피드백 개선
+- v2.3 (2025-05-20):
+  - /tmp 디렉토리 전용 사용 강제화
+  - Ruby 버전 호환성 검사 추가
+  - 강화된 권한 검증 시스템 구현
+  - 홈 디렉토리 폴백 로직 제거
+  - 해결 방법 포함된 오류 메시지 개선
 
 ### 시스템 정리 유틸리티 (system_cleanup.sh)
 
@@ -604,3 +616,33 @@ ERROR: Failed to clean Gradle cache
   - 중요 시스템 로그 보존 기능 추가
   - 오류 보고 및 사용자 피드백 개선
   - 정리 작업 검증 단계 추가
+- v2.3 (2025-05-20):
+  - /tmp 디렉토리 전용 사용 강제화
+  - Ruby 버전 호환성 검사 추가
+  - 강화된 권한 검증 시스템 구현
+  - 홈 디렉토리 폴백 로직 제거
+  - 해결 방법 포함된 오류 메시지 개선
+
+### 알려진 문제
+
+#### Ruby 버전 호환성
+
+- Ruby ≥ 3.2.0 버전 필요
+- 해결 방법:
+  ```bash
+  brew upgrade ruby
+  # 또는
+  gem install PACKAGE -v COMPATIBLE_VERSION
+  ```
+
+#### 임시 파일 정책 (v2.3+)
+
+- /tmp 전용 사용
+  ```bash
+  # 권한 문제 발생 시
+  sudo mkdir -p /tmp/brew_replace
+  sudo chown $(whoami) /tmp/brew_replace
+  chmod 700 /tmp/brew_replace
+  ```
+- 자동 정리 보장
+- 권한 검증 강화
