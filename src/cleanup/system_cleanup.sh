@@ -108,6 +108,89 @@ format_disk_space() {
     fi
 }
 
+# Function to check sudo availability
+check_sudo() {
+    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to clean user level caches
+clean_user_caches() {
+    local space_before=$(df -k / | awk 'NR==2 {print $4}')
+    
+    log_message "Cleaning user level caches..."
+    
+    # Browser caches
+    if [ -d "$HOME/Library/Caches/Google/Chrome" ]; then
+        log_message "Cleaning Chrome cache..."
+        rm -rf "$HOME/Library/Caches/Google/Chrome/Default/Cache/"* 2>/dev/null
+        rm -rf "$HOME/Library/Caches/Google/Chrome/Default/Code Cache/"* 2>/dev/null
+    fi
+    
+    if [ -d "$HOME/Library/Caches/Firefox" ]; then
+        log_message "Cleaning Firefox cache..."
+        rm -rf "$HOME/Library/Caches/Firefox/"* 2>/dev/null
+    fi
+    
+    # Development tools caches
+    if [ -d "$HOME/Library/Developer/Xcode/DerivedData" ]; then
+        log_message "Cleaning XCode DerivedData..."
+        rm -rf "$HOME/Library/Developer/Xcode/DerivedData/"* 2>/dev/null
+    fi
+    
+    if [ -d "$HOME/Library/Developer/CoreSimulator/Caches" ]; then
+        log_message "Cleaning iOS Simulator caches..."
+        rm -rf "$HOME/Library/Developer/CoreSimulator/Caches/"* 2>/dev/null
+    fi
+    
+    # Application caches
+    find "$HOME/Library/Caches" -type f -atime +30 -delete 2>/dev/null
+    find "$HOME/Library/Application Support" -name "*.log" -type f -mtime +30 -delete 2>/dev/null
+    
+    local space_after=$(df -k / | awk 'NR==2 {print $4}')
+    local space_saved=$((space_after - space_before))
+    
+    if [ $space_saved -gt 0 ]; then
+        log_message "Successfully cleaned user caches. Space saved: $(format_disk_space $((space_saved * 1024)))"
+    else
+        log_message "No significant space saved from user cache cleanup"
+    fi
+}
+
+# Function to clean system level caches (requires sudo)
+clean_system_caches() {
+    if check_sudo; then
+        local space_before=$(df -k / | awk 'NR==2 {print $4}')
+        
+        log_message "Cleaning system level caches..."
+        
+        # System caches
+        sudo rm -rf /Library/Caches/* 2>/dev/null || log_message "Some system caches could not be cleaned"
+        
+        # System logs (preserve critical logs)
+        sudo find /var/log -type f -not -name "system.log" \
+                                   -not -name "kernel.log" \
+                                   -not -name "secure.log" \
+                                   -not -name "auth.log" \
+                                   -mtime +30 -delete 2>/dev/null
+        
+        local space_after=$(df -k / | awk 'NR==2 {print $4}')
+        local space_saved=$((space_after - space_before))
+        
+        if [ $space_saved -gt 0 ]; then
+            log_message "Successfully cleaned system caches. Space saved: $(format_disk_space $((space_saved * 1024)))"
+        else
+            log_message "No significant space saved from system cache cleanup"
+        fi
+    else
+        log_message "Skipping system level cache cleanup - requires sudo privileges"
+        log_message "To clean system caches, run the script with sudo"
+    fi
+}
+
 # Start logging
 log_message "Starting system cleanup process"
 log_message "========================================="
@@ -125,63 +208,13 @@ log_message "----------------------------------------"
 log_message "SECTION 2: System Library and Cache Cleanup"
 
 if [ "$DRY_RUN" = true ]; then
-    log_message "DRY RUN: Would clean system library caches and logs"
+    log_message "DRY RUN: Would clean system and user caches"
 else
-    # System library cache cleanup
-    log_message "Checking system library cache cleanup permissions..."
-    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
-        log_message "Cleaning system library caches..."
-        if sudo rm -rf /Library/Caches/* 2>/dev/null; then
-            log_message "Successfully cleaned system library caches"
-        else
-            handle_error "Failed to clean system library caches"
-        fi
-    else
-        log_message "Skipping system library cache cleanup - requires root privileges"
-        log_message "To enable this feature, run the script with sudo or enter your password when prompted"
-    fi
+    # Always clean user level caches
+    clean_user_caches
     
-    # System logs cleanup
-    log_message "Checking system logs cleanup permissions..."
-    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
-        log_message "Cleaning system logs..."
-        # 보존해야 할 중요한 로그 파일들
-        if sudo find /var/log -type f -not -name "system.log" -not -name "secure.log" -not -name "auth.log" -delete 2>/dev/null; then
-            log_message "Successfully cleaned system logs (preserving critical logs)"
-        else
-            handle_error "Failed to clean system logs"
-        fi
-    else
-        log_message "Skipping system logs cleanup - requires root privileges"
-        log_message "To enable this feature, run the script with sudo or enter your password when prompted"
-    fi
-    
-    # User library cache cleanup
-    log_message "Checking user library cache cleanup permissions..."
-    if [ -w "$HOME/Library/Caches" ]; then
-        log_message "Cleaning user library caches..."
-        if rm -rf ~/Library/Caches/* 2>/dev/null; then
-            log_message "Successfully cleaned user library caches"
-        else
-            handle_error "Failed to clean user library caches"
-        fi
-    else
-        log_message "Skipping user library cache cleanup - insufficient permissions"
-    fi
-    
-    # Temporary items cleanup
-    log_message "Checking temporary items cleanup permissions..."
-    if [ -w "$HOME/Library/TemporaryItems" ] || sudo -n true 2>/dev/null; then
-        log_message "Cleaning temporary items..."
-        if sudo rm -rf ~/Library/TemporaryItems/* 2>/dev/null; then
-            log_message "Successfully cleaned temporary items"
-        else
-            handle_error "Failed to clean temporary items"
-        fi
-    else
-        log_message "Skipping temporary items cleanup - insufficient permissions"
-        log_message "To enable this feature, run the script with sudo or enter your password when prompted"
-    fi
+    # Attempt system level cleanup if sudo is available
+    clean_system_caches
 fi
 
 log_message "----------------------------------------"

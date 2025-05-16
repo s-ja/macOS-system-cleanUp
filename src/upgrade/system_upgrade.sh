@@ -20,6 +20,60 @@ handle_error() {
     exit 1
 }
 
+# 시스템 상태 확인 함수
+verify_system_state() {
+    log "시스템 상태 확인 중..."
+    
+    # Homebrew 상태 확인
+    if ! brew doctor &>/dev/null; then
+        log "⚠️ Homebrew 상태 이상 감지"
+        log "Homebrew 캐시 재구성 및 강제 업데이트 시도..."
+        if ! brew cleanup --prune=all && brew update --force; then
+            handle_error "Homebrew 복구 실패"
+        fi
+        log "✅ Homebrew 복구 완료"
+    fi
+
+    # 시스템 캐시 상태 확인
+    if [ ! -d "/Library/Caches" ] || [ ! -w "/Library/Caches" ]; then
+        log "⚠️ 시스템 캐시 디렉토리 접근 불가"
+        if ! sudo mkdir -p /Library/Caches && sudo chmod 755 /Library/Caches; then
+            handle_error "시스템 캐시 디렉토리 생성/권한 설정 실패"
+        fi
+        log "✅ 시스템 캐시 디렉토리 복구 완료"
+    fi
+
+    # brew 관련 디렉토리 권한 확인
+    local brew_dirs=("/usr/local/Homebrew" "/usr/local/Cellar" "/usr/local/Caskroom")
+    for dir in "${brew_dirs[@]}"; do
+        if [ -d "$dir" ] && [ ! -w "$dir" ]; then
+            log "⚠️ $dir 디렉토리 권한 문제 감지"
+            if ! sudo chown -R $(whoami) "$dir"; then
+                handle_error "$dir 권한 복구 실패"
+            fi
+            log "✅ $dir 권한 복구 완료"
+        fi
+    done
+}
+
+# 캐시 상태 확인 함수
+check_cache_state() {
+    log "캐시 상태 확인 중..."
+    
+    # Homebrew 캐시 확인
+    if ! brew doctor &>/dev/null; then
+        log "⚠️ Homebrew 캐시 재구성 필요"
+        if ! brew cleanup --prune=all && brew update --force; then
+            handle_error "Homebrew 캐시 재구성 실패"
+        fi
+        log "✅ Homebrew 캐시 재구성 완료"
+        
+        # 캐시 재구성 후 안정화를 위한 대기
+        log "시스템 안정화를 위해 10초 대기..."
+        sleep 10
+    fi
+}
+
 # 디렉토리 생성 (실패 시 즉시 종료)
 mkdir -p "$TEMP_DIR" || {
     echo "🛑 FATAL: /tmp 디렉토리 생성 실패. 수동 조치 필요:"
@@ -34,6 +88,12 @@ touch "$LOG_FILE" || {
     echo "chmod 700 /tmp/brew_replace"
     exit 1
 }
+
+# 시스템 상태 확인
+verify_system_state
+
+# 캐시 상태 확인
+check_cache_state
 
 # Homebrew 업데이트
 log "Homebrew 업데이트를 시작합니다..."
