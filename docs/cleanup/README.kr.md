@@ -13,6 +13,7 @@
 - npm 캐시 정리
 - 시스템 로그 크기 확인
 - Docker 리소스 정리(선택 사항)
+- OpenWebUI 컨테이너 및 데이터 볼륨 정리
 - node_modules 디렉토리 분석
 - Yarn 캐시 정리
 - .DS_Store 파일 정리
@@ -35,6 +36,8 @@
 
 문제 해결은 [문제 해결 가이드](TROUBLESHOOTING.md)를 참조하세요.
 
+OpenWebUI 정리 기능에 대한 자세한 정보는 [OpenWebUI 정리 문서](OPENWEBUI.kr.md)를 참조하세요.
+
 버전 기록과 변경사항은 [변경 이력](CHANGELOG.md)을 참조하세요.
 
 ## 명령행 옵션
@@ -45,7 +48,7 @@
 --dry-run       실제 정리 없이 정리될 내용만 표시
 --no-brew       Homebrew 정리 건너뛰기
 --no-npm        npm 캐시 정리 건너뛰기
---no-docker     Docker 정리 건너뛰기
+--no-docker     Docker 정리 건너뛰기 (OpenWebUI 정리도 건너뜁니다)
 --no-android    안드로이드 스튜디오 정리 건너뛰기
 ```
 

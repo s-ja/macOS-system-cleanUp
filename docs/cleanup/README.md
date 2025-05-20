@@ -13,6 +13,7 @@
 - npm cache cleanup
 - System log size checking
 - Docker resource cleanup (optional)
+- OpenWebUI container and data volume cleanup
 - node_modules directory analysis
 - Yarn cache cleanup
 - .DS_Store file cleanup
@@ -35,6 +36,8 @@ For detailed installation instructions, see [Installation Guide](../common/INSTA
 
 For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
+For more information about the OpenWebUI cleanup feature, see [OpenWebUI Cleanup Documentation](OPENWEBUI.md).
+
 For version history and changes, see [Changelog](CHANGELOG.md).
 
 ## Command Line Options
@@ -45,7 +48,7 @@ For version history and changes, see [Changelog](CHANGELOG.md).
 --dry-run       Show what would be cleaned without cleaning
 --no-brew       Skip Homebrew cleanup
 --no-npm        Skip npm cache cleanup
---no-docker     Skip Docker cleanup
+--no-docker     Skip Docker cleanup (also skips OpenWebUI cleanup)
 --no-android    Skip Android Studio cleanup
 ```
 

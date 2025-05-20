@@ -1,5 +1,18 @@
 # Changelog - System Cleanup Utility
 
+## [Unreleased]
+
+### Added
+
+- OpenWebUI container and data volume cleanup feature
+- Enhanced volume size calculation and reporting
+- Granular cleanup options for OpenWebUI data
+
+### Improved
+
+- Standardized subsection numbering
+- Better space saved calculation and reporting
+
 ## [v2.0] - 2025-04-14
 
 ### Added

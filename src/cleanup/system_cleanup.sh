@@ -516,7 +516,146 @@ else
     fi
 fi
 
-# Subsection 4.6: Android Studio Cleanup
+# Subsection 4.6: OpenWebUI Cleanup
+log_message "SUBSECTION 4.6: OpenWebUI Cleanup"
+
+if [ "$SKIP_DOCKER" = true ]; then
+    log_message "Skipping OpenWebUI cleanup (--no-docker flag detected, OpenWebUI uses Docker)"
+else
+    # Check if OpenWebUI is installed/running
+    if docker ps | grep -q "open-webui"; then
+        log_message "OpenWebUI detected. Checking data volume..."
+        
+        # Get data volume size before cleaning
+        openwebui_volume_size_before=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}')
+        # Get numeric size in bytes for comparison
+        openwebui_bytes_before=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null)
+        log_message "OpenWebUI data volume size before cleaning: $openwebui_volume_size_before"
+        
+        if [ "$DRY_RUN" = true ]; then
+            # Dry run mode - show what would be cleaned
+            log_message "DRY RUN: Would clean OpenWebUI cache files and temporary data"
+            log_message "DRY RUN: Would preserve conversation history and important settings"
+        elif [[ "$1" == "--auto-clean" ]]; then
+            # Auto-clean mode
+            log_message "Auto-cleaning OpenWebUI data (--auto-clean flag detected)..."
+            
+            # Clean cache files and temporary data
+            docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                # Remove cache directory
+                find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || true
+                
+                # Remove temporary files
+                find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || true
+                
+                # Remove old log files
+                find /data -name '*.log' -type f -mtime +30 -delete 2>/dev/null || true
+                
+                # Check for and remove DeepSeek model files (if any left)
+                find /data -name '*deepseek*' -exec rm -rf {} \; 2>/dev/null || true
+                
+                echo 'OpenWebUI data cleanup completed'
+            " 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean OpenWebUI data"
+            
+            # Restart OpenWebUI to apply changes
+            log_message "Restarting OpenWebUI container to apply changes..."
+            docker restart open-webui 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to restart OpenWebUI container"
+        else
+            # Interactive mode
+            log_message "Choose OpenWebUI cleanup options:"
+            
+            # 세분화된 정리 옵션 제공
+            read -p "Clean cache files? (y/n): " cache_clean
+            read -p "Clean temporary files? (y/n): " temp_clean
+            read -p "Clean log files older than 30 days? (y/n): " log_clean
+            read -p "Check for and remove DeepSeek model files? (y/n): " deepseek_clean
+            
+            # 선택된 옵션에 따라 정리 수행
+            if [[ "$cache_clean" == "y" || "$cache_clean" == "Y" || 
+                  "$temp_clean" == "y" || "$temp_clean" == "Y" || 
+                  "$log_clean" == "y" || "$log_clean" == "Y" || 
+                  "$deepseek_clean" == "y" || "$deepseek_clean" == "Y" ]]; then
+                
+                log_message "Cleaning OpenWebUI data based on selected options..."
+                
+                docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                    $([ "$cache_clean" == "y" ] || [ "$cache_clean" == "Y" ] && echo "# Remove cache directory
+                    find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found or already cleaned'")
+                    
+                    $([ "$temp_clean" == "y" ] || [ "$temp_clean" == "Y" ] && echo "# Remove temporary files
+                    find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found or already cleaned'")
+                    
+                    $([ "$log_clean" == "y" ] || [ "$log_clean" == "Y" ] && echo "# Remove old log files
+                    find /data -name '*.log' -type f -mtime +30 -delete 2>/dev/null || echo 'No old log files found or already cleaned'")
+                    
+                    $([ "$deepseek_clean" == "y" ] || [ "$deepseek_clean" == "Y" ] && echo "# Check for DeepSeek model files
+                    find /data -name '*deepseek*' -exec rm -rf {} \; 2>/dev/null || echo 'No DeepSeek files found or already cleaned'")
+                    
+                    echo 'OpenWebUI data cleanup completed'
+                " 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean OpenWebUI data"
+                
+                read -p "Would you like to restart the OpenWebUI container to apply changes? (y/n): " restart_openwebui
+                if [[ "$restart_openwebui" == "y" || "$restart_openwebui" == "Y" ]]; then
+                    log_message "Restarting OpenWebUI container..."
+                    docker restart open-webui 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to restart OpenWebUI container"
+                else
+                    log_message "Skipping OpenWebUI container restart"
+                fi
+            else
+                log_message "Skipping all OpenWebUI cleanup options"
+            fi
+        fi
+        
+        # Get data volume size after cleaning
+        openwebui_volume_size_after=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}')
+        # Get numeric size in bytes for comparison
+        openwebui_bytes_after=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null)
+        log_message "OpenWebUI data volume size after cleaning: $openwebui_volume_size_after"
+        
+        # Calculate and display space saved
+        if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]]; then
+            bytes_saved=$((openwebui_bytes_before - openwebui_bytes_after))
+            if [ $bytes_saved -gt 0 ]; then
+                log_message "Space saved: $(format_disk_space $bytes_saved)"
+            elif [ $bytes_saved -lt 0 ]; then
+                log_message "Volume size increased by: $(format_disk_space $((bytes_saved * -1)))"
+            else
+                log_message "No change in volume size"
+            fi
+        else
+            log_message "Could not calculate space saved (error getting volume sizes)"
+        fi
+    else
+        log_message "OpenWebUI not detected on this system (containers not running)"
+        
+        # Check if volume exists even if container is not running
+        if docker volume ls | grep -q "open-webui_open-webui"; then
+            log_message "OpenWebUI data volume found but container not running"
+            
+            read -p "Would you like to check OpenWebUI data volume for cleanup? (y/n): " check_volume
+            if [[ "$check_volume" == "y" || "$check_volume" == "Y" ]]; then
+                log_message "Cleaning OpenWebUI data volume even though container is not running..."
+                docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                    # Remove cache directory
+                    find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found'
+                    
+                    # Remove temporary files
+                    find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found'
+                    
+                    # Report volume size after cleaning
+                    echo 'Current volume size:'
+                    du -sh /data
+                " 2>&1 | tee -a "$LOG_FILE"
+            else
+                log_message "Skipping OpenWebUI volume cleanup"
+            fi
+        else
+            log_message "No OpenWebUI data volumes found"
+        fi
+    fi
+fi
+
+# Subsection 4.7: Android Studio Cleanup
 if [ "$SKIP_ANDROID" = true ]; then
     log_message "Skipping Android Studio cleanup (--no-android flag detected)"
 else
