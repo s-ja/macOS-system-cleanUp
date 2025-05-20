@@ -1,26 +1,39 @@
 #!/bin/bash
 
-# system_cleanup.sh - Automated System Cleanup Script
+# system_cleanup.sh - Automated System Cleanup Script for macOS
+# v2.5 - 2025-05-20
+#
 # This script performs various system cleanup tasks to free up disk space
-# and maintain system health.
+# and maintain system health. It includes comprehensive cleanup options
+# for development tools, application caches, and system files with
+# built-in error recovery and stability mechanisms.
 
 # 에러 발생 시 스크립트 중단
 set -e
 
 # Print help message
 show_help() {
-    echo "Usage: $0 [OPTIONS]"
+    echo "macos-system-cleanup v2.5 - 시스템 정리 도구"
+    echo "사용법: $0 [옵션]"
     echo
-    echo "Options:"
-    echo "  --help          Show this help message"
-    echo "  --auto-clean    Run all cleanup operations without prompts"
-    echo "  --dry-run       Show what would be cleaned without actually cleaning"
-    echo "  --no-brew       Skip Homebrew cleanup"
-    echo "  --no-npm        Skip npm cache cleanup"
-    echo "  --no-docker     Skip Docker cleanup"
-    echo "  --no-android    Skip Android Studio cleanup"
+    echo "옵션:"
+    echo "  --help          이 도움말 메시지 표시"
+    echo "  --auto-clean    프롬프트 없이 모든 정리 작업 자동 실행"
+    echo "  --dry-run       실제 정리 없이 정리할 내용 보기"
     echo
-    echo "Example: $0 --auto-clean --no-docker"
+    echo "선택적 정리 옵션:"
+    echo "  --no-brew       Homebrew 정리 건너뛰기"
+    echo "  --no-npm        npm 캐시 정리 건너뛰기"
+    echo "  --no-docker     Docker 정리 건너뛰기 (OpenWebUI 포함)"
+    echo "  --no-android    Android Studio 정리 건너뛰기"
+    echo
+    echo "예시:"
+    echo "  $0 --auto-clean               # 모든 정리 작업 자동 실행"
+    echo "  $0 --auto-clean --no-docker   # Docker 제외하고 정리"
+    echo "  $0 --dry-run                  # 정리할 내용만 미리보기"
+    echo
+    echo "참고: 시스템 캐시 정리를 위해서는 sudo 권한이 필요합니다."
+    echo "      sudo $0 명령으로 실행하면 더 많은 항목을 정리할 수 있습니다."
     exit 0
 }
 
@@ -405,41 +418,25 @@ else
                     log_message "Checking for outdated and unused global npm packages..."
                     
                     # Get list of global packages
+                    log_message "Getting list of global npm packages..."
                     global_packages=$(npm list -g --depth=0 2>/dev/null)
                     
                     # Check for outdated packages
+                    log_message "Checking for outdated global packages..."
                     npm_outdated=$(npm outdated -g 2>/dev/null)
                     if [ -n "$npm_outdated" ]; then
                         log_message "Found outdated global packages:"
                         echo "$npm_outdated" | tee -a "$LOG_FILE"
-                        
-                        # Ask for confirmation before removing outdated packages
-                        read -p "Would you like to update outdated global packages? (y/n): " update_global
-                        if [[ "$update_global" == "y" || "$update_global" == "Y" ]]; then
-                            log_message "Updating outdated global packages..."
-                            if npm update -g 2>&1 | tee -a "$LOG_FILE"; then
-                                log_message "Successfully updated global packages"
-                            else
-                                handle_error "Failed to update global packages"
-                            fi
-                        fi
+                        log_message "Auto-updating outdated global packages..."
+                        npm update -g 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Failed to update some global packages"
                     else
                         log_message "No outdated global packages found"
                     fi
                     
-                    # Check for unused packages
-                    log_message "Checking for unused global packages..."
-                    if npm prune -g --dry-run 2>&1 | tee -a "$LOG_FILE"; then
-                        read -p "Would you like to remove unused global packages? (y/n): " prune_global
-                        if [[ "$prune_global" == "y" || "$prune_global" == "Y" ]]; then
-                            log_message "Removing unused global packages..."
-                            if npm prune -g 2>&1 | tee -a "$LOG_FILE"; then
-                                log_message "Successfully removed unused global packages"
-                            else
-                                handle_error "Failed to remove unused global packages"
-                            fi
-                        fi
-                    fi
+                    # 'npm prune -g' 명령어는 오류를 발생시키므로 다른 방법으로 대체
+                    # 실제로는 사용하지 않는 패키지를 판단하기 어려우므로 자동 정리는 생략
+                    log_message "NOTE: Automatic removal of unused global packages is skipped"
+                    log_message "To manage global packages manually, use 'npm list -g --depth=0' to view installed packages"
                 fi
             fi
         else
@@ -493,8 +490,9 @@ log_message "Checking for large node_modules directories..."
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would scan for large node_modules directories"
 else
-    # Find top 10 largest node_modules directories
-    large_dirs=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
+    # Find top 10 largest node_modules directories - 한정된 시간 내 실행되도록 timeout 적용
+    log_message "Searching for large node_modules directories (timeout: 60s)..."
+    large_dirs=$(timeout 60s find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
     
     if [ -n "$large_dirs" ]; then
         log_message "Found the following large node_modules directories:"
@@ -503,21 +501,37 @@ else
         if [[ "$1" == "--auto-clean" ]]; then
             log_message "Checking for unused node_modules (projects not modified in last 90 days)..."
             
-            # Find project directories with node_modules that haven't been modified in over 90 days
-            old_projects=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -mtime +90 -exec dirname {} \; 2>/dev/null)
+            # 검색 범위를 일반적인 프로젝트 디렉토리로 제한하고 타임아웃 설정
+            log_message "Searching in common project directories only (timeout: 30s)..."
+            
+            # 특정 디렉토리만 검색 (일반적인 프로젝트 위치)
+            project_dirs=("$HOME/Documents" "$HOME/Projects" "$HOME/Development" "$HOME/Dev")
+            
+            old_projects=""
+            for dir in "${project_dirs[@]}"; do
+                if [ -d "$dir" ]; then
+                    log_message "Scanning $dir for unused node_modules..."
+                    result=$(timeout 30s find "$dir" -type d -name "node_modules" -not -path "*/\.*" -mtime +90 -exec dirname {} \; 2>/dev/null || echo "")
+                    if [ -n "$result" ]; then
+                        old_projects="${old_projects}${result}\n"
+                    fi
+                fi
+            done
             
             if [ -n "$old_projects" ]; then
                 log_message "Found the following potentially unused projects (not modified in 90+ days):"
-                echo "$old_projects" | tee -a "$LOG_FILE"
+                echo -e "$old_projects" | tee -a "$LOG_FILE"
                 log_message "You may want to consider removing these manually."
             else
-                log_message "No potentially unused node_modules directories found."
+                log_message "No potentially unused node_modules directories found or search timed out."
             fi
         fi
     else
-        log_message "No large node_modules directories found."
+        log_message "No large node_modules directories found or search timed out."
     fi
 fi
+
+log_message "node_modules cleanup section completed."
 
 # Subsection 4.5: Docker Cleanup
 if [ "$SKIP_DOCKER" = true ]; then
@@ -525,42 +539,78 @@ if [ "$SKIP_DOCKER" = true ]; then
 else
     if command -v docker &>/dev/null; then
         log_message "Docker is installed. Checking Docker disk usage..."
-        docker system df 2>&1 | tee -a "$LOG_FILE"
+        docker_running=false
         
-        if [ "$DRY_RUN" = true ]; then
-            # Dry run mode - show what would be cleaned
-            log_message "DRY RUN: Would clean the following Docker resources:"
-            docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE"
-            docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE"
-            docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE"
-        elif [[ "$1" == "--auto-clean" ]]; then
-            log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
-            docker_before=$(docker system df --format '{{.TotalSize}}' 2>/dev/null)
-            docker system prune -af 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker resources"
-            docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker volumes"
-            docker_after=$(docker system df --format '{{.TotalSize}}' 2>/dev/null)
-            log_message "Docker cleanup complete. Space reclaimed: $((docker_before - docker_after)) bytes"
+        # 먼저 Docker가 실행 중인지 확인 (timeout 추가)
+        if timeout 5s docker info &>/dev/null; then
+            docker_running=true
+            docker system df 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Could not get Docker disk usage info"
         else
-            read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean
-            if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
-                log_message "Cleaning Docker resources..."
-                docker system prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker resources"
+            log_message "WARNING: Docker daemon is not running or not responding"
+        fi
+        
+        if [ "$docker_running" = true ]; then
+            if [ "$DRY_RUN" = true ]; then
+                # Dry run mode - show what would be cleaned
+                log_message "DRY RUN: Would clean the following Docker resources:"
+                docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling images found"
+                docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No exited containers found"
+                docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling volumes found"
+            elif [[ "$1" == "--auto-clean" ]]; then
+                log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
                 
-                read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean
-                if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
-                    log_message "Cleaning Docker volumes..."
-                    docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Docker volumes"
+                # 안전하게 실행 (각 명령마다 오류 처리 및 타임아웃 추가)
+                log_message "Pruning Docker system (images, containers, networks)..."
+                if timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE"; then
+                    log_message "Successfully pruned Docker system"
                 else
-                    log_message "Skipping Docker volumes cleanup"
+                    log_message "WARNING: Failed or timed out while pruning Docker system. Continuing..."
                 fi
+                
+                log_message "Pruning Docker volumes..."
+                if timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE"; then
+                    log_message "Successfully pruned Docker volumes"
+                else
+                    log_message "WARNING: Failed or timed out while pruning Docker volumes. Continuing..."
+                fi
+                
+                log_message "Docker cleanup completed"
             else
-                log_message "Skipping Docker cleanup"
+                docker_clean=""
+                if ! read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean; then
+                    log_message "WARNING: Input error encountered for Docker cleanup prompt. Skipping..."
+                    docker_clean="n"
+                fi
+                
+                if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
+                    log_message "Cleaning Docker resources..."
+                    timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker system prune failed or timed out"
+                    
+                    docker_vol_clean=""
+                    if ! read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean; then
+                        log_message "WARNING: Input error encountered for Docker volumes cleanup prompt. Skipping..."
+                        docker_vol_clean="n"
+                    fi
+                    
+                    if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
+                        log_message "Cleaning Docker volumes..."
+                        timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker volume prune failed or timed out"
+                    else
+                        log_message "Skipping Docker volumes cleanup"
+                    fi
+                else
+                    log_message "Skipping Docker cleanup"
+                fi
             fi
+        else
+            log_message "Skipping Docker cleanup because daemon is not running"
         fi
     else
         log_message "Docker is not installed on this system"
     fi
 fi
+
+log_message "Docker cleanup section completed, moving to OpenWebUI cleanup..."
 
 # Subsection 4.6: OpenWebUI Cleanup
 log_message "SUBSECTION 4.6: OpenWebUI Cleanup"
@@ -568,263 +618,215 @@ log_message "SUBSECTION 4.6: OpenWebUI Cleanup"
 if [ "$SKIP_DOCKER" = true ]; then
     log_message "Skipping OpenWebUI cleanup (--no-docker flag detected, OpenWebUI uses Docker)"
 else
-    # Check if OpenWebUI is installed/running
-    if docker ps | grep -q "open-webui"; then
-        log_message "OpenWebUI detected. Checking data volume..."
-        
-        # Get data volume size before cleaning
-        openwebui_volume_size_before=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}')
-        # Get numeric size in bytes for comparison
-        openwebui_bytes_before=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null)
-        log_message "OpenWebUI data volume size before cleaning: $openwebui_volume_size_before"
-        
-        if [ "$DRY_RUN" = true ]; then
-            # Dry run mode - show what would be cleaned
-            log_message "DRY RUN: Would clean OpenWebUI cache files and temporary data"
-            log_message "DRY RUN: Would preserve conversation history and important settings"
-        elif [[ "$1" == "--auto-clean" ]]; then
-            # Auto-clean mode
-            log_message "Auto-cleaning OpenWebUI data (--auto-clean flag detected)..."
-            
-            # Clean cache files and temporary data
-            docker run --rm -v open-webui_open-webui:/data alpine sh -c "
-                # Remove cache directory
-                find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || true
-                
-                # Remove temporary files
-                find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || true
-                
-                # Remove old log files
-                find /data -name '*.log' -type f -mtime +30 -delete 2>/dev/null || true
-                
-                # Check for and remove DeepSeek model files (if any left)
-                find /data -name '*deepseek*' -exec rm -rf {} \; 2>/dev/null || true
-                
-                echo 'OpenWebUI data cleanup completed'
-            " 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean OpenWebUI data"
-            
-            # Restart OpenWebUI to apply changes
-            log_message "Restarting OpenWebUI container to apply changes..."
-            docker restart open-webui 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to restart OpenWebUI container"
-        else
-            # Interactive mode
-            log_message "Choose OpenWebUI cleanup options:"
-            
-            # 세분화된 정리 옵션 제공
-            read -p "Clean cache files? (y/n): " cache_clean
-            read -p "Clean temporary files? (y/n): " temp_clean
-            read -p "Clean log files older than 30 days? (y/n): " log_clean
-            read -p "Check for and remove DeepSeek model files? (y/n): " deepseek_clean
-            
-            # 선택된 옵션에 따라 정리 수행
-            if [[ "$cache_clean" == "y" || "$cache_clean" == "Y" || 
-                  "$temp_clean" == "y" || "$temp_clean" == "Y" || 
-                  "$log_clean" == "y" || "$log_clean" == "Y" || 
-                  "$deepseek_clean" == "y" || "$deepseek_clean" == "Y" ]]; then
-                
-                log_message "Cleaning OpenWebUI data based on selected options..."
-                
-                docker run --rm -v open-webui_open-webui:/data alpine sh -c "
-                    $([ "$cache_clean" == "y" ] || [ "$cache_clean" == "Y" ] && echo "# Remove cache directory
-                    find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found or already cleaned'")
-                    
-                    $([ "$temp_clean" == "y" ] || [ "$temp_clean" == "Y" ] && echo "# Remove temporary files
-                    find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found or already cleaned'")
-                    
-                    $([ "$log_clean" == "y" ] || [ "$log_clean" == "Y" ] && echo "# Remove old log files
-                    find /data -name '*.log' -type f -mtime +30 -delete 2>/dev/null || echo 'No old log files found or already cleaned'")
-                    
-                    $([ "$deepseek_clean" == "y" ] || [ "$deepseek_clean" == "Y" ] && echo "# Check for DeepSeek model files
-                    find /data -name '*deepseek*' -exec rm -rf {} \; 2>/dev/null || echo 'No DeepSeek files found or already cleaned'")
-                    
-                    echo 'OpenWebUI data cleanup completed'
-                " 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean OpenWebUI data"
-                
-                read -p "Would you like to restart the OpenWebUI container to apply changes? (y/n): " restart_openwebui
-                if [[ "$restart_openwebui" == "y" || "$restart_openwebui" == "Y" ]]; then
-                    log_message "Restarting OpenWebUI container..."
-                    docker restart open-webui 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to restart OpenWebUI container"
-                else
-                    log_message "Skipping OpenWebUI container restart"
-                fi
-            else
-                log_message "Skipping all OpenWebUI cleanup options"
-            fi
-        fi
-        
-        # Get data volume size after cleaning
-        openwebui_volume_size_after=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}')
-        # Get numeric size in bytes for comparison
-        openwebui_bytes_after=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null)
-        log_message "OpenWebUI data volume size after cleaning: $openwebui_volume_size_after"
-        
-        # Calculate and display space saved
-        if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]]; then
-            bytes_saved=$((openwebui_bytes_before - openwebui_bytes_after))
-            if [ $bytes_saved -gt 0 ]; then
-                log_message "Space saved: $(format_disk_space $bytes_saved)"
-            elif [ $bytes_saved -lt 0 ]; then
-                log_message "Volume size increased by: $(format_disk_space $((bytes_saved * -1)))"
-            else
-                log_message "No change in volume size"
-            fi
-        else
-            log_message "Could not calculate space saved (error getting volume sizes)"
-        fi
+    # Docker 먼저 확인
+    docker_running=false
+    if timeout 5s docker info &>/dev/null; then
+        docker_running=true
     else
-        log_message "OpenWebUI not detected on this system (containers not running)"
-        
-        # Check if volume exists even if container is not running
-        if docker volume ls | grep -q "open-webui_open-webui"; then
-            log_message "OpenWebUI data volume found but container not running"
+        log_message "WARNING: Docker daemon is not running. Skipping OpenWebUI checks."
+    fi
+    
+    if [ "$docker_running" = true ]; then
+        # Check if OpenWebUI is installed/running
+        if timeout 10s docker ps | grep -q "open-webui"; then
+            log_message "OpenWebUI detected. Checking data volume..."
             
-            read -p "Would you like to check OpenWebUI data volume for cleanup? (y/n): " check_volume
-            if [[ "$check_volume" == "y" || "$check_volume" == "Y" ]]; then
-                log_message "Cleaning OpenWebUI data volume even though container is not running..."
-                docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+            # Get data volume size before cleaning - 안전하게 타임아웃 설정
+            openwebui_volume_size_before=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}' || echo "unknown")
+            # Get numeric size in bytes for comparison
+            openwebui_bytes_before=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null || echo "0")
+            log_message "OpenWebUI data volume size before cleaning: $openwebui_volume_size_before"
+            
+            if [ "$DRY_RUN" = true ]; then
+                # Dry run mode - show what would be cleaned
+                log_message "DRY RUN: Would clean OpenWebUI cache files and temporary data"
+                log_message "DRY RUN: Would preserve conversation history and important settings"
+            elif [[ "$1" == "--auto-clean" ]]; then
+                # Auto-clean mode
+                log_message "Auto-cleaning OpenWebUI data (--auto-clean flag detected)..."
+                
+                # Clean cache files and temporary data - 안전한 명령어 실행
+                log_message "Removing cache and temporary files..."
+                if timeout 30s docker run --rm -v open-webui_open-webui:/data alpine sh -c "
                     # Remove cache directory
-                    find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found'
+                    find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || true
                     
                     # Remove temporary files
-                    find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found'
+                    find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || true
                     
-                    # Report volume size after cleaning
-                    echo 'Current volume size:'
-                    du -sh /data
-                " 2>&1 | tee -a "$LOG_FILE"
+                    # Remove old log files
+                    find /data -name '*.log' -type f -mtime +30 -delete 2>/dev/null || true
+                    
+                    # Check for and remove DeepSeek model files (if any left)
+                    find /data -name '*deepseek*' -exec rm -rf {} \; 2>/dev/null || true
+                    
+                    echo 'OpenWebUI data cleanup completed'
+                " 2>&1 | tee -a "$LOG_FILE"; then
+                    log_message "Successfully cleaned OpenWebUI files"
+                else
+                    log_message "WARNING: OpenWebUI cleanup may have timed out or failed. Continuing..."
+                fi
+                
+                # Restart OpenWebUI to apply changes
+                log_message "Restarting OpenWebUI container to apply changes..."
+                if timeout 20s docker restart open-webui 2>&1 | tee -a "$LOG_FILE"; then
+                    log_message "Successfully restarted OpenWebUI container"
+                else
+                    log_message "WARNING: Failed to restart OpenWebUI container. It may be in an inconsistent state."
+                fi
             else
-                log_message "Skipping OpenWebUI volume cleanup"
+                # 이 부분은 입력을 받으므로 복잡합니다 - 단순화하여 안전하게 실행
+                log_message "OpenWebUI cleanup requires interactive input."
+                
+                cache_clean=""
+                if ! read -p "Clean cache files? (y/n): " cache_clean; then
+                    log_message "WARNING: Input error encountered for OpenWebUI cache cleanup prompt. Skipping..."
+                    cache_clean="n"
+                fi
+                
+                # 단순화된 정리 작업: 기본 캐시 파일만 정리
+                if [[ "$cache_clean" == "y" || "$cache_clean" == "Y" ]]; then
+                    log_message "Cleaning OpenWebUI cache files..."
+                    if timeout 30s docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                        find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found or already cleaned'
+                        find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found or already cleaned'
+                        echo 'OpenWebUI cache cleanup completed'
+                    " 2>&1 | tee -a "$LOG_FILE"; then
+                        log_message "OpenWebUI cache cleanup completed successfully"
+                    else
+                        log_message "WARNING: OpenWebUI cache cleanup timed out or failed"
+                    fi
+                    
+                    restart_openwebui=""
+                    if ! read -p "Would you like to restart the OpenWebUI container to apply changes? (y/n): " restart_openwebui; then
+                        log_message "WARNING: Input error encountered for OpenWebUI restart prompt. Skipping..."
+                        restart_openwebui="n"
+                    fi
+                    
+                    if [[ "$restart_openwebui" == "y" || "$restart_openwebui" == "Y" ]]; then
+                        log_message "Restarting OpenWebUI container..."
+                        if timeout 20s docker restart open-webui 2>&1 | tee -a "$LOG_FILE"; then
+                            log_message "Successfully restarted OpenWebUI container"
+                        else
+                            log_message "WARNING: Failed to restart OpenWebUI container"
+                        fi
+                    else
+                        log_message "Skipping OpenWebUI container restart"
+                    fi
+                else
+                    log_message "Skipping all OpenWebUI cleanup options"
+                fi
+            fi
+            
+            # Get data volume size after cleaning - 안전한 체크
+            openwebui_volume_size_after=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}' || echo "unknown")
+            # Get numeric size in bytes for comparison
+            openwebui_bytes_after=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null || echo "0")
+            log_message "OpenWebUI data volume size after cleaning: $openwebui_volume_size_after"
+            
+            # Calculate and display space saved - 에러 처리
+            if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]] && [ $openwebui_bytes_before -gt 0 ] && [ $openwebui_bytes_after -gt 0 ]; then
+                bytes_saved=$((openwebui_bytes_before - openwebui_bytes_after))
+                if [ $bytes_saved -gt 0 ]; then
+                    log_message "Space saved: $(format_disk_space $bytes_saved)"
+                elif [ $bytes_saved -lt 0 ]; then
+                    log_message "Volume size increased by: $(format_disk_space $((bytes_saved * -1)))"
+                else
+                    log_message "No change in volume size"
+                fi
+            else
+                log_message "Could not accurately calculate space saved (error getting volume sizes)"
             fi
         else
-            log_message "No OpenWebUI data volumes found"
+            log_message "OpenWebUI not detected on this system (containers not running)"
+            
+            # Check if volume exists even if container is not running
+            if timeout 5s docker volume ls | grep -q "open-webui_open-webui"; then
+                log_message "OpenWebUI data volume found but container not running"
+                
+                check_volume=""
+                if [[ "$1" == "--auto-clean" ]]; then
+                    check_volume="y"
+                    log_message "Auto-cleaning OpenWebUI volume..."
+                else
+                    if ! read -p "Would you like to check OpenWebUI data volume for cleanup? (y/n): " check_volume; then
+                        log_message "WARNING: Input error encountered for OpenWebUI volume cleanup prompt. Skipping..."
+                        check_volume="n"
+                    fi
+                fi
+                
+                if [[ "$check_volume" == "y" || "$check_volume" == "Y" ]]; then
+                    log_message "Cleaning OpenWebUI data volume even though container is not running..."
+                    if timeout 30s docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                        # Remove cache directory
+                        find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found'
+                        
+                        # Remove temporary files
+                        find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found'
+                        
+                        # Report volume size after cleaning
+                        echo 'Current volume size:'
+                        du -sh /data
+                    " 2>&1 | tee -a "$LOG_FILE"; then
+                        log_message "OpenWebUI volume cleanup completed successfully"
+                    else
+                        log_message "WARNING: OpenWebUI volume cleanup timed out or failed"
+                    fi
+                else
+                    log_message "Skipping OpenWebUI volume cleanup"
+                fi
+            else
+                log_message "No OpenWebUI data volumes found"
+            fi
         fi
+    else
+        log_message "Docker is not running. Skipping OpenWebUI cleanup."
     fi
 fi
+
+log_message "OpenWebUI cleanup section completed, moving to Android Studio cleanup..."
 
 # Subsection 4.7: Android Studio Cleanup
 if [ "$SKIP_ANDROID" = true ]; then
     log_message "Skipping Android Studio cleanup (--no-android flag detected)"
+elif [ "$DRY_RUN" = true ]; then
+    log_message "DRY RUN: Would clean Android Studio caches and temporary files"
 else
-    if [ -d "$HOME/Library/Android" ] || [ -d "$HOME/Android" ]; then
-        log_message "Android Studio is installed. Checking for cleanable files..."
-        
-        # 1. Calculate sizes before cleaning
-        # Gradle caches
-        if [ -d "$HOME/.gradle/caches" ]; then
-            gradle_cache_size=$(du -sh "$HOME/.gradle/caches" 2>/dev/null | awk '{print $1}')
-            log_message "Gradle cache size: $gradle_cache_size"
-        fi
-        
-        # Android build directories
-        android_builds=$(find "$HOME" -type d -name "build" -path "*/app/build" 2>/dev/null)
-        if [ -n "$android_builds" ]; then
-            build_size=$(du -ch $android_builds 2>/dev/null | grep total$ | cut -f1)
-            log_message "Android build directories total size: $build_size"
-        fi
-        
-        # Android SDK temp files
-        if [ -d "$HOME/Library/Android/sdk/temp" ]; then
-            sdk_temp_size=$(du -sh "$HOME/Library/Android/sdk/temp" 2>/dev/null | awk '{print $1}')
-            log_message "Android SDK temp files size: $sdk_temp_size"
-        fi
-        
-        # Check AVD directory size
-        if [ -d "$HOME/.android/avd" ]; then
-            avd_size=$(du -sh "$HOME/.android/avd" 2>/dev/null | awk '{print $1}')
-            log_message "Android Virtual Device (AVD) files size: $avd_size"
-            log_message "WARNING: AVD files will be preserved to maintain virtual device settings and data"
-        fi
-        
-        # 2. Perform cleanups based on mode
-        if [ "$DRY_RUN" = true ]; then
-            log_message "DRY RUN: Would clean the following Android Studio related files:"
-            log_message "DRY RUN: - Gradle caches older than 30 days"
-            log_message "DRY RUN: - Android SDK temp files"
-            log_message "DRY RUN: - Android build directories in inactive projects"
-            log_message "DRY RUN: - AVD files will be preserved"
-        elif [[ "$1" == "--auto-clean" ]]; then
-            # Auto-clean mode - be careful with what we auto-clean
-            log_message "Auto-cleaning Android Studio files..."
-            
-            # Clean Gradle cache - only files older than 30 days
-            if [ -d "$HOME/.gradle/caches" ]; then
-                log_message "Cleaning Gradle cache files older than 30 days..."
-                if find "$HOME/.gradle/caches" -type f -atime +30 -delete 2>/dev/null; then
-                    log_message "Successfully cleaned Gradle cache files"
-                else
-                    handle_error "Failed to clean Gradle cache files"
-                fi
-            fi
-            
-            # Clean Android SDK temp files - these are safe to remove
-            if [ -d "$HOME/Library/Android/sdk/temp" ]; then
-                log_message "Cleaning Android SDK temp files..."
-                if rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null; then
-                    log_message "Successfully cleaned Android SDK temp files"
-                else
-                    handle_error "Failed to clean Android SDK temp files"
-                fi
-            fi
-            
-            # Note: We're NOT auto-cleaning AVD files as requested
-            log_message "Skipping Android Virtual Devices (AVD) to preserve settings and data"
-            
-            # Note: We're being cautious with build directories - only suggest them
-            if [ -n "$android_builds" ]; then
-                log_message "Found the following Android build directories you may want to clean manually:"
-                echo "$android_builds" | tee -a "$LOG_FILE"
-            fi
-            
-            # AVD 파일 보호 강화
-            log_message "Preserving Android Virtual Device (AVD) files..."
-            if [ -d "$HOME/.android/avd" ]; then
-                log_message "AVD directory found: $HOME/.android/avd"
-                log_message "AVD files will be preserved to maintain virtual device settings and data"
-            fi
-        else
-            # Interactive mode
-            if [ -d "$HOME/.gradle/caches" ]; then
-                read -p "Clean Gradle cache files older than 30 days? (y/n): " gradle_clean
-                if [[ "$gradle_clean" == "y" || "$gradle_clean" == "Y" ]]; then
-                    log_message "Cleaning Gradle cache files older than 30 days..."
-                    find "$HOME/.gradle/caches" -type f -atime +30 -delete 2>/dev/null
-                else
-                    log_message "Skipping Gradle cache cleanup"
-                fi
-            fi
-            
-            if [ -d "$HOME/Library/Android/sdk/temp" ]; then
-                read -p "Clean Android SDK temp files? (y/n): " sdk_temp_clean
-                if [[ "$sdk_temp_clean" == "y" || "$sdk_temp_clean" == "Y" ]]; then
-                    log_message "Cleaning Android SDK temp files..."
-                    rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null
-                else
-                    log_message "Skipping Android SDK temp files cleanup"
-                fi
-            fi
-            
-            # For build directories, just suggest manual cleaning
-            if [ -n "$android_builds" ]; then
-                log_message "Found the following Android build directories you may want to clean manually:"
-                echo "$android_builds" | tee -a "$LOG_FILE"
-            fi
-            
-            # Important warning about AVD files
-            log_message "WARNING: Android Virtual Device (AVD) files are NOT being cleaned to preserve settings and data"
-            log_message "If you need to clean AVD files, please do so manually through Android Studio's AVD Manager"
-        fi
-        
-        # 3. Show unused SDK packages if sdkmanager is available
-        if command -v "$HOME/Library/Android/sdk/tools/bin/sdkmanager" &>/dev/null; then
-            log_message "The following Android SDK packages may be outdated (check manually):"
-            "$HOME/Library/Android/sdk/tools/bin/sdkmanager" --list | grep -E "installed|Installed" | tee -a "$LOG_FILE"
-        fi
+    # 로그 확인 및 디버깅을 위한 메시지
+    log_message "Starting Android Studio cleanup..."
+    
+    # 단순화된 Android Studio 정리 코드: 기본적인 작업만 수행
+    # 문제를 방지하기 위해 복잡한 검색 작업은 제거하고 직접 경로 접근
+    
+    # Gradle 캐시 정리
+    if [ -d "$HOME/.gradle/caches" ]; then
+        log_message "Cleaning Gradle cache files older than 30 days..."
+        find "$HOME/.gradle/caches" -type f -mtime +30 -delete 2>/dev/null || true
+        log_message "Gradle cache cleanup completed"
     else
-        log_message "Android Studio not detected on this system"
+        log_message "Gradle cache directory not found, skipping..."
     fi
+    
+    # Android SDK temp 정리
+    if [ -d "$HOME/Library/Android/sdk/temp" ]; then
+        log_message "Cleaning Android SDK temp files..."
+        rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null || true
+        log_message "Android SDK temp cleanup completed"
+    else
+        log_message "Android SDK temp directory not found, skipping..."
+    fi
+    
+    # AVD 파일은 중요하므로 보존함을 안내
+    if [ -d "$HOME/.android/avd" ]; then
+        log_message "Preserving Android Virtual Device (AVD) files to maintain settings"
+    fi
+    
+    log_message "Android Studio cleanup completed successfully"
 fi
 
-# Subsection 4.7: iOS Simulator Cleanup
+log_message "Moving to iOS Simulator Cleanup..."
+
+# Subsection 4.8: iOS Simulator Cleanup
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would clean iOS Simulator caches and unused simulators"
 else
@@ -865,12 +867,31 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
         derived_size=$(du -sh "$HOME/Library/Developer/Xcode/DerivedData" 2>/dev/null | awk '{print $1}')
         log_message "XCode DerivedData size: $derived_size"
         
-        if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clean XCode DerivedData? (y/n): " xcode_clean && [[ "$xcode_clean" == "y" || "$xcode_clean" == "Y" ]]); then
-            log_message "Cleaning XCode DerivedData..."
-            if rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null; then
-                log_message "Successfully cleaned XCode DerivedData"
+        if [ "$DRY_RUN" = false ]; then
+            if [[ "$1" == "--auto-clean" ]]; then
+                # Auto-clean 모드에서는 바로 정리
+                log_message "Auto-cleaning XCode DerivedData..."
+                if rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null; then
+                    log_message "Successfully cleaned XCode DerivedData"
+                else
+                    handle_error "Failed to clean XCode DerivedData"
+                fi
             else
-                handle_error "Failed to clean XCode DerivedData"
+                # 사용자 입력을 받는 인터랙티브 모드에서 예외 처리 추가
+                xcode_clean=""
+                if ! read -p "Clean XCode DerivedData? (y/n): " xcode_clean; then
+                    log_message "WARNING: Input error encountered for XCode DerivedData cleanup prompt. Skipping..."
+                    xcode_clean="n"  # 입력 오류 시 기본값을 n으로 설정
+                fi
+                
+                if [[ "$xcode_clean" == "y" || "$xcode_clean" == "Y" ]]; then
+                    log_message "Cleaning XCode DerivedData..."
+                    if rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null; then
+                        log_message "Successfully cleaned XCode DerivedData"
+                    else
+                        handle_error "Failed to clean XCode DerivedData"
+                    fi
+                fi
             fi
         fi
     fi
@@ -889,12 +910,31 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
         archives_size=$(du -sh "$HOME/Library/Developer/Xcode/Archives" 2>/dev/null | awk '{print $1}')
         log_message "XCode Archives size: $archives_size"
         
-        if [ "$DRY_RUN" = false ] && ([[ "$1" == "--auto-clean" ]] || read -p "Clean old XCode Archives (older than 90 days)? (y/n): " archives_clean && [[ "$archives_clean" == "y" || "$archives_clean" == "Y" ]]); then
-            log_message "Cleaning XCode Archives older than 90 days..."
-            if find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null; then
-                log_message "Successfully cleaned old XCode Archives"
+        if [ "$DRY_RUN" = false ]; then 
+            if [[ "$1" == "--auto-clean" ]]; then
+                # Auto-clean 모드에서는 바로 정리
+                log_message "Cleaning XCode Archives older than 90 days..."
+                if find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null; then
+                    log_message "Successfully cleaned old XCode Archives"
+                else
+                    handle_error "Failed to clean old XCode Archives"
+                fi
             else
-                handle_error "Failed to clean old XCode Archives"
+                # 사용자 입력을 받는 인터랙티브 모드에서 예외 처리 추가
+                archives_clean=""
+                if ! read -p "Clean old XCode Archives (older than 90 days)? (y/n): " archives_clean; then
+                    log_message "WARNING: Input error encountered for XCode Archives cleanup prompt. Skipping..."
+                    archives_clean="n"  # 입력 오류 시 기본값을 n으로 설정
+                fi
+                
+                if [[ "$archives_clean" == "y" || "$archives_clean" == "Y" ]]; then
+                    log_message "Cleaning XCode Archives older than 90 days..."
+                    if find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null; then
+                        log_message "Successfully cleaned old XCode Archives"
+                    else
+                        handle_error "Failed to clean old XCode Archives"
+                    fi
+                fi
             fi
         fi
     fi
@@ -930,23 +970,34 @@ else
     done < <(find "$HOME" -name ".DS_Store" -type f -print0 2>/dev/null)
     
     if [ "$total_found" -gt 0 ]; then
-        log_message "Found $total_found .DS_Store files, total size: $(numfmt --to=iec-i --suffix=B $((total_size * 1024)))"
+        # numfmt 대신 직접 계산하여 출력
+        if [ $total_size -ge 1024 ]; then
+            size_mb=$(echo "scale=2; $total_size/1024" | bc)
+            log_message "Found $total_found .DS_Store files, total size: ${size_mb}MB"
+        else
+            log_message "Found $total_found .DS_Store files, total size: ${total_size}KB"
+        fi
         
         if [[ "$1" == "--auto-clean" ]]; then
             log_message "Auto-cleaning .DS_Store files..."
-            if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
+            if timeout 60s find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
                 log_message "Successfully removed .DS_Store files"
             else
-                handle_error "Failed to remove .DS_Store files"
+                log_message "WARNING: Some .DS_Store files could not be removed or timed out. Continuing..."
             fi
         else
-            read -p "Would you like to remove all .DS_Store files? (y/n): " ds_clean
+            ds_clean=""
+            if ! read -p "Would you like to remove all .DS_Store files? (y/n): " ds_clean; then
+                log_message "WARNING: Input error encountered for .DS_Store cleanup prompt. Skipping..."
+                ds_clean="n"
+            fi
+            
             if [[ "$ds_clean" == "y" || "$ds_clean" == "Y" ]]; then
                 log_message "Removing .DS_Store files..."
-                if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
+                if timeout 60s find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
                     log_message "Successfully removed .DS_Store files"
                 else
-                    handle_error "Failed to remove .DS_Store files"
+                    log_message "WARNING: Some .DS_Store files could not be removed. Continuing..."
                 fi
             else
                 log_message "Skipping .DS_Store cleanup"
@@ -960,7 +1011,7 @@ fi
 # Subsection 6.2: macOS Language Resources
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would check for unused language resources"
-elif [[ "$1" == "--auto-clean" ]] || read -p "Would you like to check for unused language resources? (y/n): " lang_check && [[ "$lang_check" == "y" || "$lang_check" == "Y" ]]; then
+elif [[ "$1" == "--auto-clean" ]]; then
     log_message "Checking for large language resource directories..."
     
     # Find top 10 largest localization directories
@@ -973,6 +1024,29 @@ elif [[ "$1" == "--auto-clean" ]] || read -p "Would you like to check for unused
     else
         log_message "No significant localization directories found."
     fi
+else
+    lang_check=""
+    if ! read -p "Would you like to check for unused language resources? (y/n): " lang_check; then
+        log_message "WARNING: Input error encountered for language resources prompt. Skipping..."
+        lang_check="n"
+    fi
+    
+    if [[ "$lang_check" == "y" || "$lang_check" == "Y" ]]; then
+        log_message "Checking for large language resource directories..."
+        
+        # Find top 10 largest localization directories
+        large_locales=$(find /Applications -path "*.lproj" -type d -not -path "*/en.lproj" -not -path "*/Base.lproj" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
+        
+        if [ -n "$large_locales" ]; then
+            log_message "Found the following large localization directories:"
+            echo "$large_locales" | tee -a "$LOG_FILE"
+            log_message "WARNING: Removing these may affect applications. Consider manual review."
+        else
+            log_message "No significant localization directories found."
+        fi
+    else
+        log_message "Skipping language resources check"
+    fi
 fi
 
 log_message "----------------------------------------"
@@ -980,22 +1054,77 @@ log_message "----------------------------------------"
 # Section 7: Final Summary
 log_message "SECTION 7: Final Summary"
 
-# Calculate space saved
-FINAL_FREE_SPACE=$(df -k / | awk 'NR==2 {print $4}')
+# 스크립트 종료 시 실행될 cleanup 함수 정의
+cleanup() {
+    # 종료 직전에 항상 최종 요약 보여주기
+    if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
+        log_message "Cleanup function called - ensuring proper script termination"
+        log_message "Log file is available at: $LOG_FILE"
+        echo ""
+        echo "===================================================="
+        echo "          Cleanup process has completed!            "
+        echo "===================================================="
+        echo "Log file saved to: $LOG_FILE"
+        echo "===================================================="
+    fi
+    
+    # 모든 백그라운드 프로세스 종료 (필요시)
+    # jobs -p | xargs -r kill 2>/dev/null
+}
+
+# 스크립트 종료 시 cleanup 함수 실행
+trap cleanup EXIT
+
+# 중단 신호 처리
+trap 'log_message "Script interrupted by user"; exit 130;' INT TERM
+
+# 최종 요약을 안전하게 계산하고 출력
+log_message "Computing final results..."
+
+# Calculate space saved (오류가 발생하지 않도록 안전하게 처리)
+FINAL_FREE_SPACE=$(df -k / | awk 'NR==2 {print $4}' 2>/dev/null || echo "0")
+if [ -z "$FINAL_FREE_SPACE" ] || ! [[ "$FINAL_FREE_SPACE" =~ ^[0-9]+$ ]]; then
+    FINAL_FREE_SPACE=0
+    log_message "WARNING: Could not get final free space value"
+fi
+
+if [ -z "$INITIAL_FREE_SPACE" ] || ! [[ "$INITIAL_FREE_SPACE" =~ ^[0-9]+$ ]]; then
+    INITIAL_FREE_SPACE=0
+    log_message "WARNING: Initial free space value was invalid"
+fi
+
+# 오류 없이 계산될 수 있도록 함
 SPACE_SAVED=$((FINAL_FREE_SPACE - INITIAL_FREE_SPACE))
 
 # Check disk usage after cleanup
-log_message "Initial disk free space: $(format_disk_space $((INITIAL_FREE_SPACE * 1024)))"
-log_message "Final disk free space: $(format_disk_space $((FINAL_FREE_SPACE * 1024)))"
-log_message "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+log_message "Initial disk free space: $(format_disk_space $((INITIAL_FREE_SPACE * 1024)) 2>/dev/null)"
+log_message "Final disk free space: $(format_disk_space $((FINAL_FREE_SPACE * 1024)) 2>/dev/null)"
+
+# 안전하게 공간 절약 결과 계산
+if [ $SPACE_SAVED -gt 0 ]; then
+    log_message "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+elif [ $SPACE_SAVED -lt 0 ]; then
+    log_message "WARNING: Disk space appears to have decreased by: $(format_disk_space $((-SPACE_SAVED * 1024)) 2>/dev/null)"
+    log_message "This might be due to system activities during cleanup or measurement errors"
+else
+    log_message "No significant disk space was saved"
+fi
 
 log_message "========================================="
 log_message "System cleanup completed. Log saved to: $LOG_FILE"
+log_message "End time: $(date)"
+log_message "========================================="
 
 # Provide some user guidance
 echo ""
-echo "Cleanup process completed!"
-echo "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+echo "=================================================="
+echo "             Cleanup process completed!            "
+echo "=================================================="
+if [ $SPACE_SAVED -gt 0 ]; then
+    echo "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+else
+    echo "No significant disk space was saved"
+fi
 echo ""
 echo "For additional manual cleanup, consider:"
 echo "1. Emptying the Trash (rm -rf ~/.Trash/*)"
@@ -1006,12 +1135,7 @@ echo "5. Using tools like OmniDiskSweeper or GrandPerspective to find large file
 echo ""
 echo "For additional options, run: $0 --help"
 echo "Log file saved to: $LOG_FILE"
+echo "=================================================="
 
-# Final system checks
-if pgrep -x "Xcode" > /dev/null; then
-    log_message "WARNING: XCode is running. Please close XCode before cleaning."
-    exit 1
-fi
-
-log_message "Verifying system cache regeneration..."
-sudo update_dyld_shared_cache 2>/dev/null || log_message "Cache regeneration may need manual intervention"
+# 정상 종료 상태를 반환 (0은 성공을 의미함)
+exit 0

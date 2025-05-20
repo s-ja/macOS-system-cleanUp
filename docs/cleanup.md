@@ -8,7 +8,7 @@
 
 ### Overview
 
-`system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system.
+`system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system, with built-in stability and error recovery features.
 
 ### Features
 
@@ -22,18 +22,24 @@
 - Yarn cache cleanup
 - .DS_Store file cleanup
 - Android Studio file cleanup
+- Enhanced stability with timeout protection
+- Error recovery and graceful continuation
+- Selective cleanup with skip options
 
 ### Quick Start
 
 ```bash
 # Basic usage
-./src/cleanup/system_cleanup.sh
+./src/system_cleanup.sh
 
 # Auto-clean mode
-./src/cleanup/system_cleanup.sh --auto-clean
+./src/system_cleanup.sh --auto-clean
 
 # Skip specific cleanups
-./src/cleanup/system_cleanup.sh --no-brew --no-docker
+./src/system_cleanup.sh --no-brew --no-docker
+
+# Show what would be cleaned without actual cleaning
+./src/system_cleanup.sh --dry-run
 ```
 
 For detailed installation instructions, see [Installation Guide](installation.md).
@@ -48,11 +54,24 @@ For version history and changes, see [Changelog](../CHANGELOG.md).
 --help          Show help message
 --auto-clean    Run all cleanup operations without prompts
 --dry-run       Show what would be cleaned without cleaning
+
+Skip options:
 --no-brew       Skip Homebrew cleanup
 --no-npm        Skip npm cache cleanup
 --no-docker     Skip Docker cleanup (also skips OpenWebUI cleanup)
 --no-android    Skip Android Studio cleanup
 ```
+
+### Stability Features (v2.5+)
+
+Starting with version 2.5, the script includes several stability enhancements:
+
+- **Timeout Protection**: Long-running operations have timeout limits to prevent hanging
+- **Error Recovery**: Operations continue even if individual cleanup steps fail
+- **Resource Management**: Proper cleanup of resources upon exit or interruption
+- **Selective Execution**: Skip problematic sections with command-line options
+- **Graceful Termination**: Clean termination even when interrupted by user
+- **Platform Compatibility**: Reduced dependencies on external commands
 
 ### Cleanup Features
 
@@ -102,7 +121,7 @@ MIT License - see LICENSE file for details.
 
 ### 개요
 
-`system_cleanup.sh`는 macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지하기 위해 설계된 자동화된 유지보수 스크립트입니다. 이 스크립트는 시스템의 다양한 부분에 대한 정리 작업을 수행합니다.
+`system_cleanup.sh`는 macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지하기 위해 설계된 자동화된 유지보수 스크립트입니다. 이 스크립트는 시스템의 다양한 부분에 대한 정리 작업을 수행하며, 내장된 안정성 및 오류 복구 기능을 갖추고 있습니다.
 
 ### 주요 기능
 
@@ -116,18 +135,24 @@ MIT License - see LICENSE file for details.
 - Yarn 캐시 정리
 - .DS_Store 파일 정리
 - 안드로이드 스튜디오 파일 정리
+- 타임아웃 보호로 향상된 안정성
+- 오류 복구 및 원활한 계속 진행
+- 스킵 옵션을 통한 선택적 정리
 
 ### 빠른 시작
 
 ```bash
 # 기본 사용법
-./src/cleanup/system_cleanup.sh
+./src/system_cleanup.sh
 
 # 자동 정리 모드
-./src/cleanup/system_cleanup.sh --auto-clean
+./src/system_cleanup.sh --auto-clean
 
 # 특정 정리 작업 건너뛰기
-./src/cleanup/system_cleanup.sh --no-brew --no-docker
+./src/system_cleanup.sh --no-brew --no-docker
+
+# 실제 정리 없이 정리될 내용만 보기
+./src/system_cleanup.sh --dry-run
 ```
 
 자세한 설치 방법은 [설치 가이드](installation.md)를 참조하세요.
@@ -142,11 +167,24 @@ MIT License - see LICENSE file for details.
 --help          도움말 메시지 표시
 --auto-clean    프롬프트 없이 모든 정리 작업 실행
 --dry-run       실제 정리 없이 정리될 내용만 표시
+
+스킵 옵션:
 --no-brew       Homebrew 정리 건너뛰기
 --no-npm        npm 캐시 정리 건너뛰기
 --no-docker     Docker 정리 건너뛰기 (OpenWebUI 정리도 건너뜁니다)
 --no-android    안드로이드 스튜디오 정리 건너뛰기
 ```
+
+### 안정성 기능 (v2.5+)
+
+버전 2.5부터는 다음과 같은 안정성 향상 기능이 포함되어 있습니다:
+
+- **타임아웃 보호**: 오래 실행되는 작업에 타임아웃 제한을 두어 중단 방지
+- **오류 복구**: 개별 정리 단계가 실패해도 작업이 계속 진행됨
+- **자원 관리**: 종료 또는 중단 시 자원의 올바른 정리
+- **선택적 실행**: 명령행 옵션으로 문제가 있는 섹션 건너뛰기
+- **정상 종료**: 사용자에 의해 중단되어도 깔끔하게 종료
+- **플랫폼 호환성**: 외부 명령어에 대한 의존성 감소
 
 ### 정리 기능
 
