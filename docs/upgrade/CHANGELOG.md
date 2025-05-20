@@ -1,19 +1,6 @@
 # Changelog - System Upgrade Utility
 
-## [v2.4] - 2025-05-25
-
-### Added
-
-- Automatic system state verification
-- Cache state management system
-- Homebrew directory permission recovery
-
-### Improved
-
-- Error recovery mechanism
-- Error logging and solution guides
-
-## [v2.3] - 2025-05-20
+## [v2.3] - 2023-05-20
 
 ### Added
 
@@ -29,7 +16,7 @@
 - Permission validation system
 - Error messages with solutions
 
-## [v2.0] - 2025-04-14
+## [v2.0] - 2023-04-14
 
 ### Added
 
