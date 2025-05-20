@@ -36,8 +36,6 @@ For detailed installation instructions, see [Installation Guide](../common/INSTA
 
 For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
-For more information about the OpenWebUI cleanup feature, see [OpenWebUI Cleanup Documentation](OPENWEBUI.md).
-
 For version history and changes, see [Changelog](CHANGELOG.md).
 
 ## Command Line Options
@@ -51,6 +49,31 @@ For version history and changes, see [Changelog](CHANGELOG.md).
 --no-docker     Skip Docker cleanup (also skips OpenWebUI cleanup)
 --no-android    Skip Android Studio cleanup
 ```
+
+## Cleanup Features
+
+### OpenWebUI Cleanup
+
+The OpenWebUI cleanup feature helps manage disk space used by OpenWebUI, a Docker-based web interface for AI models. This feature detects OpenWebUI installations by:
+
+1. Checking for running Docker containers named "open-webui"
+2. Checking for Docker volumes related to OpenWebUI
+
+#### Cleanup Options
+
+- **Cache Files**: Removes cache directories that can safely be deleted
+- **Temporary Files**: Removes `.temp`, `.tmp`, `.downloading`, and `.part` files
+- **Log Files**: Removes log files older than 30 days
+- **DeepSeek Model Files**: Option to remove DeepSeek model files if they're no longer needed
+
+The script reports volume size before and after cleaning, along with the exact space saved.
+
+#### Safety Considerations
+
+- Preserves conversation history and important settings
+- Container restart is optional but recommended to apply changes
+- Uses Docker volume operations for safe access to data
+- Can operate even if the container is not currently running
 
 ## Security Considerations
 

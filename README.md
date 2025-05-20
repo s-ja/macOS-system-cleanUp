@@ -1,25 +1,69 @@
-# macOS System Maintenance Tools
+# macOS System Maintenance Tools / macOS 시스템 유지보수 도구
 
-[한국어 문서 보기](README.kr.md)
+[English](#english) | [한국어](#korean)
+
+<a id="english"></a>
+
+## English
 
 A collection of utilities for maintaining and optimizing your macOS system.
 
-## Available Tools
+### Available Tools
 
-### [System Cleanup Utility](docs/cleanup/README.md)
+#### System Cleanup Utility
 
 Automated maintenance script for cleaning up your macOS system, freeing disk space, and maintaining system health.
 
-### [System Upgrade Utility](docs/upgrade/README.md)
+[Learn more about System Cleanup Utility](docs/cleanup.md)
+
+#### System Upgrade Utility
 
 Automated upgrade script for keeping your macOS system's packages and applications up to date.
 
-## Quick Links
+[Learn more about System Upgrade Utility](docs/upgrade.md)
 
-- [Installation Guide](docs/common/INSTALLATION.md)
-- [Contributing Guidelines](docs/common/CONTRIBUTING.md)
-- [Security Policy](docs/common/SECURITY.md)
+### Quick Links
 
-## License
+- [Installation Guide](docs/installation.md)
+- [Troubleshooting Guide](docs/troubleshooting.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
+- [Security Policy](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+
+### License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+---
+
+<a id="korean"></a>
+
+## 한국어
+
+macOS 시스템 유지보수 및 최적화를 위한 유틸리티 모음입니다.
+
+### 제공 도구
+
+#### 시스템 정리 유틸리티
+
+macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지하기 위한 자동화된 유지보수 스크립트입니다.
+
+[시스템 정리 유틸리티에 대해 자세히 알아보기](docs/cleanup.md)
+
+#### 시스템 업그레이드 유틸리티
+
+macOS 시스템의 패키지와 애플리케이션을 최신 상태로 유지하기 위한 자동화된 업그레이드 스크립트입니다.
+
+[시스템 업그레이드 유틸리티에 대해 자세히 알아보기](docs/upgrade.md)
+
+### 빠른 링크
+
+- [설치 가이드](docs/installation.md)
+- [문제 해결 가이드](docs/troubleshooting.md)
+- [기여 가이드라인](CONTRIBUTING.md)
+- [보안 정책](SECURITY.md)
+- [변경 이력](CHANGELOG.md)
+
+### 라이선스
+
+이 프로젝트는 MIT 라이선스로 배포됩니다. 자세한 내용은 LICENSE 파일을 참조하세요.

@@ -4,6 +4,9 @@
 # This script performs various system cleanup tasks to free up disk space
 # and maintain system health.
 
+# 에러 발생 시 스크립트 중단
+set -e
+
 # Print help message
 show_help() {
     echo "Usage: $0 [OPTIONS]"
@@ -65,6 +68,8 @@ handle_error() {
     local error_message="$1"
     echo "ERROR: $error_message" | tee -a "$LOG_FILE"
     echo "Continuing with next task..." | tee -a "$LOG_FILE"
+    # 반환 코드를 추가하지만 종료하지는 않음
+    return 1
 }
 
 # Function to log messages
@@ -158,6 +163,8 @@ clean_user_caches() {
     else
         log_message "No significant space saved from user cache cleanup"
     fi
+    
+    return 0
 }
 
 # Function to clean system level caches (requires sudo)
@@ -189,9 +196,12 @@ clean_system_caches() {
         log_message "Skipping system level cache cleanup - requires sudo privileges"
         log_message "To clean system caches, run the script with sudo"
     fi
+    
+    return 0
 }
 
 # Start logging
+log_message "========================================="
 log_message "Starting system cleanup process"
 log_message "========================================="
 
@@ -211,16 +221,32 @@ if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would clean system and user caches"
 else
     # Always clean user level caches
-    clean_user_caches
+    if ! clean_user_caches; then
+        log_message "⚠️ Warning: User cache cleanup had issues, but continuing..."
+    fi
     
     # Attempt system level cleanup if sudo is available
-    clean_system_caches
+    if ! clean_system_caches; then
+        log_message "⚠️ Warning: System cache cleanup had issues, but continuing..."
+    fi
 fi
 
 log_message "----------------------------------------"
 
 # Section 3: Time Machine Local Snapshots
 log_message "SECTION 3: Time Machine Local Snapshots"
+
+# 스냅샷 제거 함수
+clean_time_machine_snapshots() {
+    log_message "Removing local snapshots..."
+    if sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE"; then
+        log_message "Successfully removed local snapshots"
+        return 0
+    else
+        handle_error "Failed to remove local snapshots - sudo privileges may be required"
+        return 1
+    fi
+}
 
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would check and manage Time Machine local snapshots"
@@ -242,19 +268,14 @@ else
             
             if [[ "$1" == "--auto-clean" ]]; then
                 log_message "Auto-cleaning local snapshots..."
-                if sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE"; then
-                    log_message "Successfully removed local snapshots"
-                else
-                    handle_error "Failed to remove local snapshots - sudo privileges may be required"
+                if ! clean_time_machine_snapshots; then
+                    log_message "⚠️ Warning: Failed to clean Time Machine snapshots, but continuing..."
                 fi
             else
                 read -p "Would you like to remove local snapshots? (y/n): " remove_snapshots
                 if [[ "$remove_snapshots" == "y" || "$remove_snapshots" == "Y" ]]; then
-                    log_message "Removing local snapshots..."
-                    if sudo tmutil thinlocalsnapshots / 9999999999999999 1 2>&1 | tee -a "$LOG_FILE"; then
-                        log_message "Successfully removed local snapshots"
-                    else
-                        handle_error "Failed to remove local snapshots - sudo privileges may be required"
+                    if ! clean_time_machine_snapshots; then
+                        log_message "⚠️ Warning: Failed to clean Time Machine snapshots, but continuing..."
                     fi
                 else
                     log_message "Skipping local snapshots cleanup"
@@ -274,6 +295,52 @@ log_message "----------------------------------------"
 log_message "SECTION 4: Development Tools Cleanup"
 
 # Subsection 4.1: Homebrew Cleanup
+clean_homebrew() {
+    # Update Homebrew and upgrade all installed packages
+    log_message "Updating Homebrew and upgrading installed packages..."
+    if ! brew update 2>&1 | tee -a "$LOG_FILE"; then
+        handle_error "Failed to update Homebrew"
+        return 1
+    fi
+    
+    if ! brew upgrade 2>&1 | tee -a "$LOG_FILE"; then
+        handle_error "Failed to upgrade packages"
+        return 1
+    fi
+    
+    # Run brew doctor to check for potential problems
+    log_message "Running brew doctor to check for potential problems..."
+    if ! brew doctor 2>&1 | tee -a "$LOG_FILE"; then
+        handle_error "Brew doctor check failed"
+        # Continue despite errors from brew doctor
+    fi
+    
+    # Check for outdated packages
+    log_message "Checking for outdated packages..."
+    brew outdated 2>&1 | tee -a "$LOG_FILE"
+    
+    # Check for unused dependencies
+    log_message "Checking for unused dependencies..."
+    brew autoremove -n 2>&1 | tee -a "$LOG_FILE"
+    
+    if [[ "$1" == "--auto-clean" ]]; then
+        log_message "Auto-removing unused dependencies..."
+        if ! brew autoremove 2>&1 | tee -a "$LOG_FILE"; then
+            handle_error "Failed to remove unused dependencies"
+            # Continue despite errors
+        fi
+    fi
+    
+    # Clean up Homebrew
+    log_message "Cleaning up Homebrew cache and old versions..."
+    if ! brew cleanup --prune=all 2>&1 | tee -a "$LOG_FILE"; then
+        handle_error "Failed to clean Homebrew"
+        return 1
+    fi
+    
+    return 0
+}
+
 if [ "$SKIP_BREW" = true ]; then
     log_message "Skipping Homebrew cleanup (--no-brew flag detected)"
 else
@@ -290,31 +357,10 @@ else
             log_message "DRY RUN: Would remove unused dependencies"
             log_message "DRY RUN: Would clean up Homebrew cache and old versions"
         else
-            # Update Homebrew and upgrade all installed packages
-            log_message "Updating Homebrew and upgrading installed packages..."
-            brew update 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to update Homebrew"
-            brew upgrade 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to upgrade packages"
-            
-            # Run brew doctor to check for potential problems
-            log_message "Running brew doctor to check for potential problems..."
-            brew doctor 2>&1 | tee -a "$LOG_FILE" || handle_error "Brew doctor check failed"
-            
-            # Check for outdated packages
-            log_message "Checking for outdated packages..."
-            brew outdated 2>&1 | tee -a "$LOG_FILE"
-            
-            # Check for unused dependencies
-            log_message "Checking for unused dependencies..."
-            brew autoremove -n 2>&1 | tee -a "$LOG_FILE"
-            
-            if [[ "$1" == "--auto-clean" ]]; then
-                log_message "Auto-removing unused dependencies..."
-                brew autoremove 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to remove unused dependencies"
+            # Call the cleanup function
+            if ! clean_homebrew "$1"; then
+                log_message "⚠️ Warning: Some Homebrew cleanup operations failed, but continuing..."
             fi
-            
-            # Clean up Homebrew
-            log_message "Cleaning up Homebrew cache and old versions..."
-            brew cleanup --prune=all 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Homebrew"
             
             # Get cache size after cleaning
             brew_cache_size_after=$(du -sh "$brew_cache_dir" 2>/dev/null | awk '{print $1}')
