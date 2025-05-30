@@ -3,7 +3,7 @@
 # macOS System Cleanup Script
 # Safely removes temporary files, caches, logs, and other unnecessary data
 # Author: Claude Code
-# Version: 1.0
+# Version: 1.1
 
 # set -e  # Exit on any error (제거됨)
 
