@@ -791,34 +791,146 @@ if [ "$SKIP_ANDROID" = true ]; then
     log_message "Skipping Android Studio cleanup (--no-android flag detected)"
 elif [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would clean Android Studio caches and temporary files"
+    log_message "DRY RUN: Would check for old Android Studio versions and clean invalid data"
 else
-    # 로그 확인 및 디버깅을 위한 메시지
     log_message "Starting Android Studio cleanup..."
     
-    # 단순화된 Android Studio 정리 코드: 기본적인 작업만 수행
-    # 문제를 방지하기 위해 복잡한 검색 작업은 제거하고 직접 경로 접근
+    # Check for multiple Android Studio versions
+    android_studio_dirs=$(ls -d "$HOME/Library/Application Support/Google/AndroidStudio"* 2>/dev/null || echo "")
+    if [ -n "$android_studio_dirs" ]; then
+        log_message "Found Android Studio installations:"
+        echo "$android_studio_dirs" | while read -r dir; do
+            version=$(basename "$dir")
+            size=$(du -sh "$dir" 2>/dev/null | awk '{print $1}')
+            log_message "  $version: $size"
+        done | tee -a "$LOG_FILE"
+        
+        # Count number of versions
+        version_count=$(echo "$android_studio_dirs" | wc -l)
+        if [ "$version_count" -gt 1 ]; then
+            log_message "Multiple Android Studio versions detected ($version_count versions)"
+            
+            if [[ "$1" == "--auto-clean" ]]; then
+                log_message "Auto-cleaning old Android Studio data..."
+                # Keep only the latest version (remove all but the newest)
+                latest_version=$(echo "$android_studio_dirs" | sort | tail -n 1)
+                old_versions=$(echo "$android_studio_dirs" | grep -v "$latest_version")
+                if [ -n "$old_versions" ]; then
+                    echo "$old_versions" | while read -r old_dir; do
+                        if [ -d "$old_dir" ]; then
+                            version_name=$(basename "$old_dir")
+                            log_message "Removing old Android Studio data: $version_name"
+                            rm -rf "$old_dir" 2>/dev/null || log_message "Warning: Could not remove $old_dir"
+                        fi
+                    done
+                else
+                    log_message "No old versions to clean"
+                fi
+            else
+                read -p "Clean old Android Studio versions (keep latest only)? (y/n): " clean_old_versions
+                if [[ "$clean_old_versions" == "y" || "$clean_old_versions" == "Y" ]]; then
+                    latest_version=$(echo "$android_studio_dirs" | sort | tail -n 1)
+                    old_versions=$(echo "$android_studio_dirs" | grep -v "$latest_version")
+                    if [ -n "$old_versions" ]; then
+                        echo "$old_versions" | while read -r old_dir; do
+                            if [ -d "$old_dir" ]; then
+                                version_name=$(basename "$old_dir")
+                                log_message "Removing old Android Studio data: $version_name"
+                                rm -rf "$old_dir" 2>/dev/null || log_message "Warning: Could not remove $old_dir"
+                            fi
+                        done
+                    else
+                        log_message "No old versions to clean"
+                    fi
+                else
+                    log_message "Skipping old Android Studio version cleanup"
+                fi
+            fi
+        fi
+    fi
     
-    # Gradle 캐시 정리
+    # Clean Android Studio preferences
+    as_prefs="$HOME/Library/Preferences/com.google.android.studio.plist"
+    if [ -f "$as_prefs" ]; then
+        log_message "Found Android Studio preferences file"
+        # Check file modification time (cleanup if older than 90 days and auto-clean is enabled)
+        if [[ "$1" == "--auto-clean" ]] && find "$as_prefs" -mtime +90 -print 2>/dev/null | grep -q .; then
+            log_message "Removing old Android Studio preferences (older than 90 days)"
+            rm -f "$as_prefs" 2>/dev/null || log_message "Warning: Could not remove preferences file"
+        fi
+    fi
+    
+    # Clean Android Emulator preferences
+    emulator_prefs="$HOME/Library/Preferences/com.android.Emulator.plist"
+    if [ -f "$emulator_prefs" ]; then
+        log_message "Found Android Emulator preferences file"
+        if [[ "$1" == "--auto-clean" ]] && find "$emulator_prefs" -mtime +90 -print 2>/dev/null | grep -q .; then
+            log_message "Removing old Android Emulator preferences (older than 90 days)"
+            rm -f "$emulator_prefs" 2>/dev/null || log_message "Warning: Could not remove emulator preferences"
+        fi
+    fi
+    
+    # Gradle 캐시 정리 (개선된 버전)
     if [ -d "$HOME/.gradle/caches" ]; then
+        gradle_cache_size_before=$(du -sh "$HOME/.gradle/caches" 2>/dev/null | awk '{print $1}')
+        log_message "Gradle cache size before cleaning: $gradle_cache_size_before"
+        
         log_message "Cleaning Gradle cache files older than 30 days..."
         find "$HOME/.gradle/caches" -type f -mtime +30 -delete 2>/dev/null || true
-        log_message "Gradle cache cleanup completed"
+        
+        # Clean gradle daemon logs
+        if [ -d "$HOME/.gradle/daemon" ]; then
+            find "$HOME/.gradle/daemon" -name "*.log" -mtime +7 -delete 2>/dev/null || true
+        fi
+        
+        gradle_cache_size_after=$(du -sh "$HOME/.gradle/caches" 2>/dev/null | awk '{print $1}')
+        log_message "Gradle cache size after cleaning: $gradle_cache_size_after"
     else
         log_message "Gradle cache directory not found, skipping..."
     fi
     
-    # Android SDK temp 정리
-    if [ -d "$HOME/Library/Android/sdk/temp" ]; then
-        log_message "Cleaning Android SDK temp files..."
-        rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null || true
-        log_message "Android SDK temp cleanup completed"
+    # Android SDK 정리 (개선된 버전)
+    if [ -d "$HOME/Library/Android/sdk" ]; then
+        log_message "Found Android SDK directory"
+        
+        # Clean temp files
+        if [ -d "$HOME/Library/Android/sdk/temp" ]; then
+            log_message "Cleaning Android SDK temp files..."
+            rm -rf "$HOME/Library/Android/sdk/temp"/* 2>/dev/null || true
+        fi
+        
+        # Clean build-tools cache
+        if [ -d "$HOME/Library/Android/sdk/build-tools" ]; then
+            find "$HOME/Library/Android/sdk/build-tools" -name "*.tmp" -delete 2>/dev/null || true
+        fi
+        
+        # Clean platform-tools logs
+        if [ -d "$HOME/Library/Android/sdk/platform-tools" ]; then
+            find "$HOME/Library/Android/sdk/platform-tools" -name "*.log" -mtime +30 -delete 2>/dev/null || true
+        fi
+        
+        log_message "Android SDK cleanup completed"
     else
-        log_message "Android SDK temp directory not found, skipping..."
+        log_message "Android SDK directory not found, skipping..."
     fi
     
-    # AVD 파일은 중요하므로 보존함을 안내
-    if [ -d "$HOME/.android/avd" ]; then
-        log_message "Preserving Android Virtual Device (AVD) files to maintain settings"
+    # Android 디렉토리 정리
+    if [ -d "$HOME/.android" ]; then
+        log_message "Cleaning Android user directory..."
+        
+        # Clean cache but preserve AVD and other important files
+        if [ -d "$HOME/.android/cache" ]; then
+            rm -rf "$HOME/.android/cache"/* 2>/dev/null || true
+            log_message "Android cache directory cleaned"
+        fi
+        
+        # Clean debug logs
+        find "$HOME/.android" -name "*.log" -mtime +30 -delete 2>/dev/null || true
+        
+        # AVD 파일은 중요하므로 보존함을 안내
+        if [ -d "$HOME/.android/avd" ]; then
+            log_message "Preserving Android Virtual Device (AVD) files to maintain settings"
+        fi
     fi
     
     log_message "Android Studio cleanup completed successfully"
