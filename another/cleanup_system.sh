@@ -5,7 +5,7 @@
 # Author: Claude Code
 # Version: 1.0
 
-set -e  # Exit on any error
+# set -e  # Exit on any error (제거됨)
 
 # Colors for output
 RED='\033[0;31m'
@@ -301,39 +301,47 @@ show_menu() {
     echo
 }
 
+# 각 단계별 에러 핸들링 래퍼 함수 추가
+run_step() {
+    local step_name="$1"
+    shift
+    if ! "$@"; then
+        print_color $RED "Error: ${step_name} 단계에서 에러가 발생했습니다. 다음 단계로 넘어갑니다."
+    fi
+}
+
 # Function to run cleanup based on choice
 run_cleanup() {
     local choice=$1
-    
     case $choice in
-        1) clean_user_caches ;;
-        2) clean_system_caches ;;
-        3) clean_logs ;;
-        4) clean_temp_files ;;
-        5) clean_browser_caches ;;
-        6) clean_downloads ;;
-        7) clean_trash ;;
-        8) clean_dev_caches ;;
-        9) 
-            clean_user_caches
-            clean_system_caches
-            clean_logs
-            clean_temp_files
-            clean_browser_caches
-            clean_downloads
-            clean_trash
-            clean_dev_caches
+        1) run_step "User Caches" clean_user_caches ;;
+        2) run_step "System Caches" clean_system_caches ;;
+        3) run_step "Log Files" clean_logs ;;
+        4) run_step "Temporary Files" clean_temp_files ;;
+        5) run_step "Browser Caches" clean_browser_caches ;;
+        6) run_step "Downloads" clean_downloads ;;
+        7) run_step "Trash" clean_trash ;;
+        8) run_step "Development Caches" clean_dev_caches ;;
+        9)
+            run_step "User Caches" clean_user_caches
+            run_step "System Caches" clean_system_caches
+            run_step "Log Files" clean_logs
+            run_step "Temporary Files" clean_temp_files
+            run_step "Browser Caches" clean_browser_caches
+            run_step "Downloads" clean_downloads
+            run_step "Trash" clean_trash
+            run_step "Development Caches" clean_dev_caches
             ;;
         10)
             DRY_RUN=true
-            clean_user_caches
-            clean_system_caches
-            clean_logs
-            clean_temp_files
-            clean_browser_caches
-            clean_downloads
-            clean_trash
-            clean_dev_caches
+            run_step "User Caches" clean_user_caches
+            run_step "System Caches" clean_system_caches
+            run_step "Log Files" clean_logs
+            run_step "Temporary Files" clean_temp_files
+            run_step "Browser Caches" clean_browser_caches
+            run_step "Downloads" clean_downloads
+            run_step "Trash" clean_trash
+            run_step "Development Caches" clean_dev_caches
             ;;
         0) exit 0 ;;
         *) print_color $RED "Invalid option" ;;
