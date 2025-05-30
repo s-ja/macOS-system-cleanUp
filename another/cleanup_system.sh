@@ -275,8 +275,9 @@ clean_dev_caches() {
     if command -v docker >/dev/null 2>&1; then
         print_color $BLUE "Docker found. Cleaning unused Docker data..."
         if [[ $DRY_RUN == false ]]; then
-            docker system prune -f 2>/dev/null || true
-            print_color $GREEN "Cleaned Docker system data"
+            print_color $YELLOW "Running docker system prune..."
+            docker system prune -f
+            print_color $GREEN "Docker system cleanup completed"
         else
             print_color $YELLOW "DRY RUN: Would clean Docker system data"
         fi
