@@ -43,6 +43,7 @@ SKIP_BREW=false
 SKIP_NPM=false
 SKIP_DOCKER=false
 SKIP_ANDROID=false
+AUTO_CLEAN=false
 
 for arg in "$@"; do
     case $arg in
@@ -63,6 +64,9 @@ for arg in "$@"; do
             ;;
         --no-android)
             SKIP_ANDROID=true
+            ;;
+        --auto-clean)
+            AUTO_CLEAN=true
             ;;
     esac
 done
@@ -133,6 +137,36 @@ check_sudo() {
     else
         return 1
     fi
+}
+
+# Function to check if Docker daemon is running
+check_docker_daemon() {
+    if ! command -v docker &>/dev/null; then
+        log_message "Docker is not installed on this system"
+        return 1
+    fi
+    
+    if ! timeout 5s docker info &>/dev/null; then
+        log_message "Docker daemon is not running"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Function to check if Xcode is installed
+check_xcode_installed() {
+    if ! command -v xcode-select &>/dev/null; then
+        log_message "Xcode command line tools are not installed"
+        return 1
+    fi
+    
+    if ! xcode-select -p &>/dev/null; then
+        log_message "Xcode is not installed"
+        return 1
+    fi
+    
+    return 0
 }
 
 # Function to clean user level caches
@@ -273,13 +307,7 @@ else
             log_message "Found the following local snapshots:"
             echo "$local_snapshots" | tee -a "$LOG_FILE"
             
-            # Check if we have sudo privileges
-            if ! sudo -n true 2>/dev/null; then
-                log_message "WARNING: sudo privileges required for removing local snapshots"
-                log_message "Please run the script with sudo or enter your password when prompted"
-            fi
-            
-            if [[ "$1" == "--auto-clean" ]]; then
+            if [ "$AUTO_CLEAN" = true ]; then
                 log_message "Auto-cleaning local snapshots..."
                 if ! clean_time_machine_snapshots; then
                     log_message "⚠️ Warning: Failed to clean Time Machine snapshots, but continuing..."
@@ -309,14 +337,20 @@ log_message "SECTION 4: Development Tools Cleanup"
 
 # Subsection 4.1: Homebrew Cleanup
 clean_homebrew() {
+    # Check if running as root
+    if [ "$(id -u)" = "0" ]; then
+        log_message "WARNING: Running Homebrew as root is not supported. Skipping Homebrew cleanup."
+        return 1
+    fi
+    
     # Update Homebrew and upgrade all installed packages
     log_message "Updating Homebrew and upgrading installed packages..."
-    if ! brew update 2>&1 | tee -a "$LOG_FILE"; then
+    if ! HOMEBREW_NO_AUTO_UPDATE=1 brew update 2>&1 | tee -a "$LOG_FILE"; then
         handle_error "Failed to update Homebrew"
         return 1
     fi
     
-    if ! brew upgrade 2>&1 | tee -a "$LOG_FILE"; then
+    if ! HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade 2>&1 | tee -a "$LOG_FILE"; then
         handle_error "Failed to upgrade packages"
         return 1
     fi
@@ -537,76 +571,64 @@ log_message "node_modules cleanup section completed."
 if [ "$SKIP_DOCKER" = true ]; then
     log_message "Skipping Docker cleanup (--no-docker flag detected)"
 else
-    if command -v docker &>/dev/null; then
-        log_message "Docker is installed. Checking Docker disk usage..."
-        docker_running=false
+    if check_docker_daemon; then
+        log_message "Docker is running. Proceeding with cleanup..."
+        docker system df 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Could not get Docker disk usage info"
         
-        # 먼저 Docker가 실행 중인지 확인 (timeout 추가)
-        if timeout 5s docker info &>/dev/null; then
-            docker_running=true
-            docker system df 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Could not get Docker disk usage info"
-        else
-            log_message "WARNING: Docker daemon is not running or not responding"
-        fi
-        
-        if [ "$docker_running" = true ]; then
-            if [ "$DRY_RUN" = true ]; then
-                # Dry run mode - show what would be cleaned
-                log_message "DRY RUN: Would clean the following Docker resources:"
-                docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling images found"
-                docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No exited containers found"
-                docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling volumes found"
-            elif [[ "$1" == "--auto-clean" ]]; then
-                log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
-                
-                # 안전하게 실행 (각 명령마다 오류 처리 및 타임아웃 추가)
-                log_message "Pruning Docker system (images, containers, networks)..."
-                if timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE"; then
-                    log_message "Successfully pruned Docker system"
-                else
-                    log_message "WARNING: Failed or timed out while pruning Docker system. Continuing..."
-                fi
-                
-                log_message "Pruning Docker volumes..."
-                if timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE"; then
-                    log_message "Successfully pruned Docker volumes"
-                else
-                    log_message "WARNING: Failed or timed out while pruning Docker volumes. Continuing..."
-                fi
-                
-                log_message "Docker cleanup completed"
+        if [ "$DRY_RUN" = true ]; then
+            # Dry run mode - show what would be cleaned
+            log_message "DRY RUN: Would clean the following Docker resources:"
+            docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling images found"
+            docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No exited containers found"
+            docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling volumes found"
+        elif [[ "$1" == "--auto-clean" ]]; then
+            log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
+            
+            # 안전하게 실행 (각 명령마다 오류 처리 및 타임아웃 추가)
+            log_message "Pruning Docker system (images, containers, networks)..."
+            if timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE"; then
+                log_message "Successfully pruned Docker system"
             else
-                docker_clean=""
-                if ! read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean; then
-                    log_message "WARNING: Input error encountered for Docker cleanup prompt. Skipping..."
-                    docker_clean="n"
+                log_message "WARNING: Failed or timed out while pruning Docker system. Continuing..."
+            fi
+            
+            log_message "Pruning Docker volumes..."
+            if timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE"; then
+                log_message "Successfully pruned Docker volumes"
+            else
+                log_message "WARNING: Failed or timed out while pruning Docker volumes. Continuing..."
+            fi
+            
+            log_message "Docker cleanup completed"
+        else
+            docker_clean=""
+            if ! read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean; then
+                log_message "WARNING: Input error encountered for Docker cleanup prompt. Skipping..."
+                docker_clean="n"
+            fi
+            
+            if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
+                log_message "Cleaning Docker resources..."
+                timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker system prune failed or timed out"
+                
+                docker_vol_clean=""
+                if ! read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean; then
+                    log_message "WARNING: Input error encountered for Docker volumes cleanup prompt. Skipping..."
+                    docker_vol_clean="n"
                 fi
                 
-                if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
-                    log_message "Cleaning Docker resources..."
-                    timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker system prune failed or timed out"
-                    
-                    docker_vol_clean=""
-                    if ! read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean; then
-                        log_message "WARNING: Input error encountered for Docker volumes cleanup prompt. Skipping..."
-                        docker_vol_clean="n"
-                    fi
-                    
-                    if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
-                        log_message "Cleaning Docker volumes..."
-                        timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker volume prune failed or timed out"
-                    else
-                        log_message "Skipping Docker volumes cleanup"
-                    fi
+                if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
+                    log_message "Cleaning Docker volumes..."
+                    timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker volume prune failed or timed out"
                 else
-                    log_message "Skipping Docker cleanup"
+                    log_message "Skipping Docker volumes cleanup"
                 fi
+            else
+                log_message "Skipping Docker cleanup"
             fi
-        else
-            log_message "Skipping Docker cleanup because daemon is not running"
         fi
     else
-        log_message "Docker is not installed on this system"
+        log_message "Skipping Docker cleanup - daemon is not running"
     fi
 fi
 
@@ -942,16 +964,20 @@ log_message "Moving to iOS Simulator Cleanup..."
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would clean iOS Simulator caches and unused simulators"
 else
-    if command -v xcrun &>/dev/null; then
+    if check_xcode_installed; then
         # Clean simulator caches
         log_message "Cleaning iOS Simulator caches..."
-        rm -rf ~/Library/Developer/CoreSimulator/Caches/* 2>/dev/null || handle_error "Failed to clean simulator caches"
+        if ! rm -rf ~/Library/Developer/CoreSimulator/Caches/* 2>/dev/null; then
+            log_message "WARNING: Failed to clean simulator caches - permission denied or files in use"
+        fi
         
         # Remove unavailable simulators
         log_message "Removing unavailable simulators..."
-        xcrun simctl delete unavailable 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to remove unavailable simulators"
+        if ! xcrun simctl delete unavailable 2>&1 | tee -a "$LOG_FILE"; then
+            log_message "WARNING: Failed to remove unavailable simulators - permission denied or command failed"
+        fi
     else
-        log_message "xcrun command not found, skipping simulator cleanup"
+        log_message "Skipping iOS Simulator cleanup - Xcode not installed"
     fi
 fi
 
@@ -1123,9 +1149,8 @@ fi
 # Subsection 6.2: macOS Language Resources
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would check for unused language resources"
-elif [[ "$1" == "--auto-clean" ]]; then
-    log_message "Checking for large language resource directories..."
-    
+elif [ "$AUTO_CLEAN" = true ]; then
+    log_message "Auto-cleaning language resources..."
     # Find top 10 largest localization directories
     large_locales=$(find /Applications -path "*.lproj" -type d -not -path "*/en.lproj" -not -path "*/Base.lproj" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
     
