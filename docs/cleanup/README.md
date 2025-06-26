@@ -4,7 +4,7 @@
 
 ## Overview
 
-`system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system.
+`system_cleanup.sh` is an automated maintenance script designed to clean up your macOS system, free disk space, and maintain system health. It performs a series of cleanup operations on various parts of your system with enhanced stability and error recovery features.
 
 ## Features
 
@@ -17,7 +17,10 @@
 - node_modules directory analysis
 - Yarn cache cleanup
 - .DS_Store file cleanup
-- Android Studio file cleanup
+- Android Studio file cleanup with multi-version support
+- Enhanced stability with timeout protection
+- Error recovery and graceful continuation
+- Selective cleanup with skip options
 
 ## Quick Start
 
@@ -37,6 +40,15 @@ For detailed installation instructions, see [Installation Guide](../common/INSTA
 For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
+
+## Recent Improvements (v2.6)
+
+- **Enhanced Stability**: Improved overall script stability and functionality
+- **Better Error Handling**: Strengthened error handling mechanisms throughout the script
+- **Improved Logging**: Enhanced logging system for better debugging and monitoring
+- **Performance Optimization**: Various performance improvements for faster execution
+- **Compatibility**: Better compatibility across different system environments
+- **Permission Handling**: Improved permission-related error handling
 
 ## Command Line Options
 
