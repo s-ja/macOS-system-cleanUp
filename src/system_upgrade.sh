@@ -116,21 +116,30 @@ cleanup() {
     fi
 }
 
-# 종료 시 정리 함수 등록
+# 종료 시 정리 함수 등록 (스크립트 종료 시에만 실행)
 trap cleanup EXIT
 
-# 디렉토리 생성 (실패 시 즉시 종료)
-mkdir -p "$TEMP_DIR" || {
-    log_message "🛑 FATAL: /tmp 디렉토리 생성 실패. 수동 조치 필요:"
-    log_message "1. sudo mkdir -p /tmp/brew_replace"
-    log_message "2. sudo chown $(whoami) /tmp/brew_replace"
+# 임시 디렉토리 생성 및 권한 설정
+log_message "임시 디렉토리 설정 중..."
+if ! mkdir -p "$TEMP_DIR"; then
+    log_message "🛑 FATAL: 임시 디렉토리 생성 실패. 수동 조치 필요:"
+    log_message "1. sudo mkdir -p $TEMP_DIR"
+    log_message "2. sudo chown $(whoami) $TEMP_DIR"
     exit 1
-}
+fi
+
+# 임시 디렉토리 권한 확인 및 설정
+if [ ! -w "$TEMP_DIR" ]; then
+    if ! chmod 755 "$TEMP_DIR"; then
+        log_message "🛑 FATAL: 임시 디렉토리 권한 설정 실패"
+        exit 1
+    fi
+fi
 
 # 로그 파일 초기화
 touch "$LOG_FILE" || {
     log_message "🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요:"
-    log_message "chmod 700 /tmp/brew_replace"
+    log_message "chmod 755 $TEMP_DIR"
     exit 1
 }
 
@@ -145,19 +154,25 @@ verify_system_state || exit 1
 # 캐시 상태 확인
 check_cache_state || exit 1
 
+# =========================================
 # Homebrew 업데이트
+# =========================================
 log_message "Homebrew 업데이트를 시작합니다..."
 if ! brew update; then
     handle_error "Homebrew 업데이트 실패"
 fi
 
+# =========================================
 # Homebrew Cask 업데이트
+# =========================================
 log_message "Homebrew Cask 업데이트를 시작합니다..."
 if ! brew cu -a; then
     handle_error "Homebrew Cask 업데이트 실패"
 fi
 
-# topgrade 설치 및 실행
+# =========================================
+# 시스템 전체 업데이트 (topgrade)
+# =========================================
 log_message "topgrade를 실행하여 모든 패키지와 앱을 업데이트합니다..."
 if ! command -v topgrade &> /dev/null; then
     log_message "topgrade가 설치되어 있지 않습니다. 설치를 시작합니다..."
@@ -166,46 +181,99 @@ if ! command -v topgrade &> /dev/null; then
     fi
 fi
 
-# topgrade 실행 (자동 모드)
-if ! topgrade --yes; then
+# topgrade 실행 (안드로이드 스튜디오 비활성화)
+if ! topgrade --disable android_studio --yes; then
     handle_error "topgrade 실행 실패"
 fi
 
-# /Applications 디렉토리로 이동
-cd /Applications || handle_error "Applications 디렉토리 접근 실패"
+# =========================================
+# 안드로이드 스튜디오 별도 관리
+# =========================================
+log_message "안드로이드 스튜디오 업데이트를 확인합니다..."
+if command -v studio &> /dev/null; then
+    current_version=$(brew info --cask android-studio | grep "Installed" | awk '{print $2}' | tr -d '()')
+    log_message "현재 안드로이드 스튜디오 버전: $current_version"
+    
+    # 안드로이드 스튜디오 업데이트 확인 (선택적)
+    log_message "안드로이드 스튜디오를 업데이트하시겠습니까? (y/n)"
+    read -r update_android_studio
+    if [[ "$update_android_studio" =~ ^[Yy]$ ]]; then
+        log_message "안드로이드 스튜디오 업데이트를 시작합니다..."
+        if ! brew upgrade --cask android-studio; then
+            log_message "⚠️ 안드로이드 스튜디오 업데이트 실패 (정상적인 상황일 수 있음)"
+        else
+            log_message "✅ 안드로이드 스튜디오 업데이트 완료"
+        fi
+    else
+        log_message "안드로이드 스튜디오 업데이트를 건너뜁니다."
+    fi
+else
+    log_message "안드로이드 스튜디오가 설치되어 있지 않습니다."
+fi
+
+# =========================================
+# 새로운 앱 검색 및 설치
+# =========================================
 
 log_message "Homebrew Cask로 설치 가능한 앱을 검색합니다..."
 
+# 임시 디렉토리가 존재하는지 다시 확인
+if [ ! -d "$TEMP_DIR" ]; then
+    log_message "임시 디렉토리를 다시 생성합니다..."
+    mkdir -p "$TEMP_DIR" || {
+        handle_error "임시 디렉토리 재생성 실패"
+        return 1
+    }
+fi
+
 # 현재 설치된 Cask 목록 저장
-if ! brew list --cask > "$INSTALLED_APPS"; then
+log_message "설치된 Cask 목록을 저장합니다..."
+if ! brew list --cask > "$INSTALLED_APPS" 2>/dev/null; then
     handle_error "설치된 Cask 목록 저장 실패"
+    return 1
 fi
 
 # 설치 가능한 Cask 목록 저장 (최적화된 검색)
-if ! brew search --casks "" | grep -v "No Cask found" > "$AVAILABLE_CASKS"; then
+log_message "사용 가능한 Cask 목록을 저장합니다..."
+if ! brew search --casks "" 2>/dev/null | grep -v "No Cask found" > "$AVAILABLE_CASKS"; then
     handle_error "사용 가능한 Cask 목록 저장 실패"
+    return 1
 fi
 
 # 발견된 앱을 저장할 배열
 declare -a found_apps
 
-# 각 .app 파일에 대해 확인 (성능 최적화)
-find . -maxdepth 1 -name "*.app" -print0 | while IFS= read -r -d '' app; do
-    app_name="${app#./}"
-    app_name="${app_name%.app}"
-    cask_name="${app_name// /-}"
-
-    # 설치 가능한 Cask 목록에 있는지 확인
-    if grep -Fxq "$cask_name" "$AVAILABLE_CASKS"; then
-        # 이미 설치된 Cask 목록에 없는 경우
-        if ! grep -Fxq "$cask_name" "$INSTALLED_APPS"; then
-            # 앱 버전 확인
-            app_version=$(mdls -name kMDItemVersion "$app" | awk -F'"' '{print $2}')
-            log_message "Homebrew Cask로 설치 가능한 앱 발견: $app_name (현재 버전: $app_version)"
-            found_apps+=("$cask_name")
+# /Applications 디렉토리에서 앱 검색
+log_message "Applications 디렉토리에서 앱을 검색합니다..."
+if [ -d "/Applications" ]; then
+    cd /Applications || {
+        handle_error "Applications 디렉토리 접근 실패"
+        return 1
+    }
+    
+    # 각 .app 파일에 대해 확인 (성능 최적화)
+    while IFS= read -r -d '' app; do
+        app_name="${app#./}"
+        app_name="${app_name%.app}"
+        cask_name="${app_name// /-}"
+        
+        # 설치 가능한 Cask 목록에 있는지 확인
+        if [ -f "$AVAILABLE_CASKS" ] && grep -Fxq "$cask_name" "$AVAILABLE_CASKS" 2>/dev/null; then
+            # 이미 설치된 Cask 목록에 없는 경우
+            if [ -f "$INSTALLED_APPS" ] && ! grep -Fxq "$cask_name" "$INSTALLED_APPS" 2>/dev/null; then
+                # 앱 버전 확인
+                app_version=$(mdls -name kMDItemVersion "$app" 2>/dev/null | awk -F'"' '{print $2}' || echo "unknown")
+                log_message "Homebrew Cask로 설치 가능한 앱 발견: $app_name (현재 버전: $app_version)"
+                found_apps+=("$cask_name")
+            fi
         fi
-    fi
-done
+    done < <(find . -maxdepth 1 -name "*.app" -print0 2>/dev/null)
+    
+    # 원래 디렉토리로 복귀
+    cd - > /dev/null || true
+else
+    log_message "Applications 디렉토리를 찾을 수 없습니다."
+fi
 
 # 발견된 앱이 있는 경우
 if [ ${#found_apps[@]} -gt 0 ]; then
