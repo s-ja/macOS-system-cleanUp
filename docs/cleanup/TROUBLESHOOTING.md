@@ -86,34 +86,6 @@ ERROR: Failed to clean Gradle cache
    cp -r ~/.android/avd ~/avd_backup
    ```
 
-### Command Not Found Errors on zsh
-
-```bash
-get_free_space:2: command not found: awk
-```
-
-**Solutions**:
-
-1. PATH를 명시적으로 설정:
-   ```bash
-   export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
-   ```
-2. 최신 스크립트를 사용해 위 경로가 자동으로 적용되도록 합니다.
-
-### Incorrect Timestamp Format
-
-```bash
-INFO: 스크립트 시작 시간: #오후
-```
-
-**Solutions**:
-
-1. 명시적 날짜 형식 지정:
-   ```bash
-   date '+%Y-%m-%d %H:%M:%S'
-   ```
-2. 최신 스크립트는 해당 형식을 기본으로 사용합니다.
-
 ### System Cache Issues
 
 ```bash
