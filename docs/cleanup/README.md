@@ -18,7 +18,6 @@
 - Yarn cache cleanup
 - .DS_Store file cleanup
 - Android Studio file cleanup with multi-version support
-- Enhanced stability with timeout protection
 - Error recovery and graceful continuation
 - Selective cleanup with skip options
 
@@ -41,6 +40,14 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
+<<<<<<< HEAD
+## Recent Improvements (v3.0)
+
+- **Unified UI**: Standardized section headers and dividers across all messages
+- **Safe Operations**: Added `safe_remove`, `safe_clear_cache`, and `create_backup` helpers
+- **Protected Paths**: Critical system directories are now guarded against accidental deletion
+- **Consistent DRY RUN**: Unified warning and summary output when using `--dry-run`
+=======
 ## Recent Improvements (v3.1)
 
 - **Cross-shell Compatibility**: Works perfectly with both zsh and bash
@@ -48,6 +55,7 @@ For version history and changes, see [Changelog](CHANGELOG.md).
 - **Backward Compatibility**: Existing bash users can continue using without changes
 - **Unified UI**: Standardized section headers and dividers across all messages
 - **Safe Operations**: Added `safe_remove`, `safe_clear_cache`, and `create_backup` helpers
+>>>>>>> bc475dc26d6de204561fa8d5e6778fbb2f2c48ca
 
 ## Command Line Options
 

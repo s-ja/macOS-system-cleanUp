@@ -37,6 +37,14 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
+<<<<<<< HEAD
+## Recent Improvements (v3.0)
+
+- **New Options**: Added `--help`, `--dry-run`, and `--auto-yes`
+- **Granular Skips**: `--no-brew`, `--no-cask`, `--no-topgrade`, `--no-android`, `--no-apps`
+- **Unified UI**: Standardized headers and dividers across all sections
+- **Safe Operations**: Protected path system and safe file helpers for destructive commands
+=======
 ## Recent Improvements (v3.1)
 
 - **Cross-shell Compatibility**: Works perfectly with both zsh and bash
@@ -44,6 +52,7 @@ For version history and changes, see [Changelog](CHANGELOG.md).
 - **Runtime Shell Detection**: Dynamic feature selection via `ZSH_VERSION` variable
 - **Backward Compatibility**: Existing bash users can continue using without changes
 - **New Options**: Added `--help`, `--dry-run`, and `--auto-yes`
+>>>>>>> bc475dc26d6de204561fa8d5e6778fbb2f2c48ca
 
 ## Safety Features
 

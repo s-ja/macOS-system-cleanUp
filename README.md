@@ -20,29 +20,21 @@ Automated maintenance script for cleaning up your macOS system, freeing disk spa
 - Comprehensive system cleanup (caches, logs, temporary files)
 - Development tool cleanup (Homebrew, npm, Yarn, Docker, Android Studio)
 - Selective cleanup with skip options (`--no-brew`, `--no-npm`, `--no-docker`, `--no-android`)
-- Enhanced stability with timeout handling and error recovery
+- Enhanced stability with robust error recovery
 - Detailed logging for tracking cleanup activities
 
-[Learn more about System Cleanup Utility](docs/cleanup.md)
+[Learn more about System Cleanup Utility](docs/cleanup/README.md)
 
 #### System Upgrade Utility
 
 Automated upgrade script for keeping your macOS system's packages and applications up to date.
 
-**Key Features:**
-
-- Cross-shell compatibility (works with both zsh and bash)
-- Automatic package manager updates (Homebrew, Cask, topgrade)
-- Smart application detection and management
-- Comprehensive command-line options for fine-grained control
-- Safe operation with dry-run mode and user confirmations
-
-[Learn more about System Upgrade Utility](docs/upgrade.md)
+[Learn more about System Upgrade Utility](docs/upgrade/README.md)
 
 ### Quick Links
 
-- [Installation Guide](docs/installation.md)
-- [Troubleshooting Guide](docs/troubleshooting.md)
+- [Installation Guide](docs/common/INSTALLATION.md)
+- Troubleshooting Guides: [Cleanup](docs/cleanup/TROUBLESHOOTING.md) | [Upgrade](docs/upgrade/TROUBLESHOOTING.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 - [Security Policy](SECURITY.md)
 - [Changelog](CHANGELOG.md)
@@ -71,10 +63,10 @@ macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지�
 - 종합적인 시스템 정리(캐시, 로그, 임시 파일)
 - 개발 도구 정리(Homebrew, npm, Yarn, Docker, Android Studio)
 - 선택적 정리를 위한 스킵 옵션(`--no-brew`, `--no-npm`, `--no-docker`, `--no-android`)
-- 타임아웃 처리와 오류 복구를 통한 향상된 안정성
+- 사용자 확인과 오류 복구를 통한 향상된 안정성
 - 정리 활동 추적을 위한 상세 로깅
 
-[시스템 정리 유틸리티에 대해 자세히 알아보기](docs/cleanup.md)
+[시스템 정리 유틸리티에 대해 자세히 알아보기](docs/cleanup/README.md)
 
 #### 시스템 업그레이드 유틸리티
 
@@ -88,12 +80,12 @@ macOS 시스템의 패키지와 애플리케이션을 최신 상태로 유지하
 - 세밀한 제어를 위한 포괄적인 명령줄 옵션
 - 드라이 런 모드와 사용자 확인을 통한 안전한 작업
 
-[시스템 업그레이드 유틸리티에 대해 자세히 알아보기](docs/upgrade.md)
+[시스템 업그레이드 유틸리티에 대해 자세히 알아보기](docs/upgrade/README.md)
 
 ### 빠른 링크
 
-- [설치 가이드](docs/installation.md)
-- [문제 해결 가이드](docs/troubleshooting.md)
+- [설치 가이드](docs/common/INSTALLATION.kr.md)
+- 문제 해결 가이드: [정리](docs/cleanup/TROUBLESHOOTING.kr.md) | [업그레이드](docs/upgrade/TROUBLESHOOTING.kr.md)
 - [기여 가이드라인](CONTRIBUTING.md)
 - [보안 정책](SECURITY.md)
 - [변경 이력](CHANGELOG.md)

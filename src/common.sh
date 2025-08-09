@@ -296,13 +296,13 @@ get_user_input_with_timeout() {
             printf "%s: " "$prompt"
         fi
         
-        # 입력 받기 (timeout 적용)
-        if read -r -t "$timeout" user_input; then
+        # 입력 받기
+        if read -r user_input; then
             # 빈 입력시 기본값 사용
             if [[ -z "$user_input" && -n "$default_value" ]]; then
                 user_input="$default_value"
             fi
-            
+
             # 유효한 옵션이 지정된 경우 검증
             if [[ -n "$valid_options" ]]; then
                 if echo "$valid_options" | grep -q "$user_input"; then
@@ -316,11 +316,6 @@ get_user_input_with_timeout() {
                 echo "$user_input"
                 return 0
             fi
-        else
-            # 타임아웃 발생
-            log_warning "${timeout}초 입력 시간 초과. 기본값을 사용합니다: $default_value"
-            echo "$default_value"
-            return 0
         fi
     done
 }
@@ -364,7 +359,7 @@ check_docker_daemon() {
         return 1
     fi
     
-    if timeout 5s docker info >/dev/null 2>&1; then
+    if docker info >/dev/null 2>&1; then
         return 0
     else
         log_info "Docker 데몬이 실행되고 있지 않습니다"
