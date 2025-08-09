@@ -270,6 +270,18 @@ get_user_input() {
     local valid_options="${3:-}"
     local user_input=""
     
+    # 기본 타임아웃 30초로 get_user_input_with_timeout 호출
+    get_user_input_with_timeout "$1" "$2" "$3" 30
+}
+
+# 타임아웃 지원 사용자 입력 받기
+get_user_input_with_timeout() {
+    local prompt="$1"
+    local default_value="${2:-}"
+    local valid_options="${3:-}"
+    local timeout="${4:-30}"
+    local user_input=""
+    
     # 입력 검증
     if [[ -z "$prompt" ]]; then
         handle_error "get_user_input() requires prompt parameter"
@@ -285,7 +297,7 @@ get_user_input() {
         fi
         
         # 입력 받기 (timeout 적용)
-        if read -r -t 30 user_input; then
+        if read -r -t "$timeout" user_input; then
             # 빈 입력시 기본값 사용
             if [[ -z "$user_input" && -n "$default_value" ]]; then
                 user_input="$default_value"
@@ -306,7 +318,7 @@ get_user_input() {
             fi
         else
             # 타임아웃 발생
-            log_warning "입력 시간 초과. 기본값을 사용합니다: $default_value"
+            log_warning "${timeout}초 입력 시간 초과. 기본값을 사용합니다: $default_value"
             echo "$default_value"
             return 0
         fi
@@ -317,9 +329,10 @@ get_user_input() {
 confirm_action() {
     local prompt="$1"
     local default="${2:-n}"
+    local timeout="${3:-30}"
     local response
     
-    response=$(get_user_input "$prompt (y/n)" "$default" "y n Y N")
+    response=$(get_user_input_with_timeout "$prompt (y/n)" "$default" "y n Y N" "$timeout")
     
     case "$response" in
         [Yy]*)
@@ -387,13 +400,37 @@ check_homebrew_health() {
         return 1
     fi
     
-    # brew doctor 실행으로 상태 확인
-    if brew doctor >/dev/null 2>&1; then
+    # brew doctor 실행으로 상태 확인 (출력 내용 분석)
+    local doctor_output
+    doctor_output=$(brew doctor 2>&1)
+    local doctor_exit_code=$?
+    
+    # 정상 상태 메시지 확인 ("Your system is ready to brew.")
+    if [[ "$doctor_output" == *"Your system is ready to brew"* ]]; then
         return 0
-    else
-        log_warning "Homebrew 상태에 문제가 있습니다"
-        return 1
     fi
+    
+    # PATH 관련 warning만 있는 경우는 정상으로 처리
+    if [[ "$doctor_output" == *"occurs before"* ]] && [[ "$doctor_output" == *"in your PATH"* ]]; then
+        # PATH warning만 있고 다른 critical 오류가 없으면 정상
+        if [[ "$doctor_output" != *"Error:"* ]] && [[ "$doctor_output" != *"Fatal:"* ]]; then
+            return 0
+        fi
+    fi
+    
+    # "please don't worry or file an issue; just ignore this" 메시지가 있으면 정상
+    if [[ "$doctor_output" == *"just ignore this"* ]] && [[ "$doctor_output" != *"Error:"* ]]; then
+        return 0
+    fi
+    
+    # Warning만 있고 치명적인 오류가 없으면 정상으로 처리
+    if [[ "$doctor_output" == *"Warning:"* ]] && [[ "$doctor_output" != *"Error:"* ]] && [[ "$doctor_output" != *"Fatal:"* ]]; then
+        return 0
+    fi
+    
+    # 실제 치명적 오류가 있는 경우만 문제로 판단
+    log_warning "Homebrew 상태에 문제가 있습니다"
+    return 1
 }
 
 # ==============================================

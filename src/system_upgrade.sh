@@ -404,7 +404,7 @@ else
         if [[ "$AUTO_YES" == "true" ]]; then
             should_update=true
             log_info "자동 확인 모드: 안드로이드 스튜디오 업데이트 진행"
-        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "y"; then
+        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "y" 30; then
             should_update=true
         fi
         
@@ -516,7 +516,7 @@ elif command_exists brew; then
         if [[ "$AUTO_YES" == "true" ]]; then
             should_install=true
             log_info "자동 확인 모드: 발견된 앱들을 설치합니다"
-        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "y"; then
+        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "y" 30; then
             should_install=true
         fi
         
