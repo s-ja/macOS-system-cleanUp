@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # system_cleanup.sh - Automated System Cleanup Script for macOS
 # v3.0 - Enhanced with improved common library integration
@@ -13,7 +13,12 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 # 공통 함수 라이브러리 로드
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh와 bash 모두 호환되는 스크립트 경로 얻기
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/common.sh" || {
     echo "🛑 FATAL: common.sh를 로드할 수 없습니다"
     exit 1

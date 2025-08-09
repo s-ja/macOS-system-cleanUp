@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # system_upgrade.sh - Automated System Upgrade Script for macOS
 # v3.0 - Enhanced with improved common library integration
@@ -12,7 +12,12 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 # 공통 함수 라이브러리 로드
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh와 bash 모두 호환되는 스크립트 경로 얻기
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/common.sh" || {
     echo "🛑 FATAL: common.sh를 로드할 수 없습니다"
     exit 1
@@ -448,7 +453,12 @@ elif command_exists brew; then
             app_name="${app#./}"
             app_name="${app_name%.app}"
             cask_name="${app_name// /-}"
-            cask_name="${cask_name,,}"  # 소문자로 변환
+            # zsh와 bash 모두 호환되는 소문자 변환
+            if [[ -n "${ZSH_VERSION:-}" ]]; then
+                cask_name="${(L)cask_name}"
+            else
+                cask_name="${cask_name,,}"
+            fi
             
             # 설치 가능한 Cask 목록에 있는지 확인
             if [[ -f "$AVAILABLE_CASKS" ]] && grep -Fxq "$cask_name" "$AVAILABLE_CASKS" 2>/dev/null; then

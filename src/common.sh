@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 # common.sh - 공통 함수 라이브러리
 # macOS 시스템 유지보수 스크립트들을 위한 통합 함수 모음
 
@@ -7,12 +7,18 @@
 # ==============================================
 
 # 스크립트 정보 설정
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh와 bash 모두 호환되는 스크립트 경로 얻기
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LOG_DIR="$PROJECT_ROOT/logs"
 
 # 로그 파일 변수 (각 스크립트에서 설정)
-declare -g LOG_FILE=""
+# declare -g는 Bash 4.2+ 필요, 호환성을 위해 일반 변수로 선언
+LOG_FILE=""
 
 # ==============================================
 # 로깅 시스템
