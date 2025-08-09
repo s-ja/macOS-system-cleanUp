@@ -6,6 +6,9 @@
 # 전역 변수 설정
 # ==============================================
 
+# 안전한 PATH 설정 (시스템 명령어 접근 보장)
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # 스크립트 정보 설정
 # zsh와 bash 모두 호환되는 스크립트 경로 얻기
 if [[ -n "${ZSH_VERSION:-}" ]]; then
@@ -583,7 +586,7 @@ print_script_start() {
     local script_version="${2:-3.0}"
     
     print_section_header "$script_name v$script_version 시작"
-    log_info "스크립트 시작 시간: $(date)"
+    log_info "스크립트 시작 시간: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "실행 사용자: $(whoami)"
     log_info "시스템 정보: $(uname -a)"
 }
