@@ -2,6 +2,46 @@
 
 이 문서는 macOS System Maintenance Tools 프로젝트의 모든 주요 변경 사항을 기록합니다.
 
+## [v3.0] - 2024-12-28
+
+### 신규/Added
+
+- **system_upgrade.sh** 완전한 도움말 시스템 (`--help` 플래그)
+- **DRY RUN 모드** 지원으로 안전한 미리보기 기능 (`--dry-run`)
+- **자동 실행 모드** 추가 (`--auto-yes` 옵션)
+- **세밀한 제어 옵션들**: `--no-brew`, `--no-cask`, `--no-topgrade`, `--no-android`, `--no-apps`
+- **UI 표준화 함수들**: `print_section_header()`, `print_section_divider()`, `print_subsection_header()`
+- **안전한 파일 작업 함수들**: `safe_remove()`, `safe_clear_cache()`, `create_backup()`
+- **보호된 경로 시스템**: 중요 시스템 디렉토리 삭제 방지
+
+### 개선/Improved
+
+- **모든 스크립트의 UI 요소 통일**: 일관된 섹션 헤더, 구분선, 메시지 형식
+- **파괴적 명령어 안전성 강화**: `rm -rf` 직접 호출을 안전한 함수로 교체
+- **사용자 확인 시스템 강화**: 중요한 작업 전 확인 프롬프트 및 타임아웃 지원
+- **에러 처리 개선**: 더 상세한 오류 메시지와 복구 옵션 제공
+- **로깅 시스템 향상**: 표준화된 로그 레벨과 메시지 형식
+
+### 보안/Security
+
+- **경로 정규화**: `realpath`를 사용한 경로 검증
+- **보호된 디렉토리 목록**: `/`, `/usr`, `/System`, `/Applications`, `$HOME` 등 보호
+- **사용자 권한 확인**: 중요한 작업 전 권한 및 확인 절차 강화
+- **안전한 임시 파일 처리**: `mktemp` 사용과 적절한 권한 설정
+
+### 수정/Fixed
+
+- **Chrome/Firefox/Safari 캐시 정리**: 안전한 캐시 정리 함수로 개선
+- **시스템 캐시 정리**: 개별 항목별 안전한 정리로 변경
+- **Xcode DerivedData 정리**: 보호된 삭제 함수 사용
+- **iOS Simulator 캐시**: 안전한 캐시 정리 적용
+
+### 문서화/Documentation
+
+- **help 메시지 표준화**: 모든 옵션과 사용 예시 포함
+- **사용법 가이드 개선**: DRY RUN과 자동 모드 설명 추가
+- **권장사항 추가**: 시스템 재시작, 정기 실행, 백업 확인 안내
+
 ## [v2.6] - 2025-06-26
 
 ### 개선/Improved (업그레이드 유틸리티)
