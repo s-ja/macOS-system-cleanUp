@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # system_cleanup.sh - Automated System Cleanup Script for macOS
 # v3.0 - Enhanced with improved common library integration
@@ -12,8 +12,19 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
+# 안전한 PATH 설정 (시스템 명령어 접근 보장)
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+# 명령어 alias 설정 (확실한 접근 보장)
+alias awk='/usr/bin/awk'
+
 # 공통 함수 라이브러리 로드
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh와 bash 모두 호환되는 스크립트 경로 얻기
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/common.sh" || {
     echo "🛑 FATAL: common.sh를 로드할 수 없습니다"
     exit 1
@@ -182,7 +193,7 @@ clean_user_caches() {
     
     if [[ $old_cache_count -gt 0 ]]; then
         find "$HOME/Library/Caches" -type f -atime +30 -delete 2>/dev/null
-        log_success "오래된 캐시 파일 $old_cache_count개 정리 완료"
+        log_success "오래된 캐시 파일 ${old_cache_count}개 정리 완료"
     fi
     
     # 오래된 로그 파일 정리
@@ -192,7 +203,7 @@ clean_user_caches() {
     
     if [[ $old_log_count -gt 0 ]]; then
         find "$HOME/Library/Application Support" -name "*.log" -type f -mtime +30 -delete 2>/dev/null
-        log_success "오래된 로그 파일 $old_log_count개 정리 완료"
+        log_success "오래된 로그 파일 ${old_log_count}개 정리 완료"
     fi
     
     # 결과 계산
@@ -202,7 +213,7 @@ clean_user_caches() {
     space_saved_formatted=$(calculate_space_saved "$space_before" "$space_after")
     
     if [[ $cleaned_count -gt 0 ]]; then
-        log_success "사용자 캐시 정리 완료 ($cleaned_count개 카테고리). 절약된 공간: $space_saved_formatted"
+        log_success "사용자 캐시 정리 완료 (${cleaned_count}개 카테고리). 절약된 공간: $space_saved_formatted"
     else
         log_info "정리할 사용자 캐시가 없습니다"
     fi
@@ -242,7 +253,7 @@ clean_system_caches() {
                 done < <(sudo find /Library/Caches -maxdepth 1 -mindepth 1 -print0 2>/dev/null)
                 
                 if [[ $cache_items -gt 0 ]]; then
-                    log_success "시스템 캐시 정리 완료 ($cache_items개 항목)"
+                    log_success "시스템 캐시 정리 완료 (${cache_items}개 항목)"
                     cache_cleaned=true
                 else
                     log_info "정리할 시스템 캐시가 없습니다"
@@ -281,7 +292,7 @@ clean_system_caches() {
         
         if [[ $log_count -gt 0 ]]; then
             eval "sudo find /var/log -type f $find_conditions -mtime +30 -delete 2>/dev/null"
-            log_success "오래된 시스템 로그 $log_count개 정리 완료"
+            log_success "오래된 시스템 로그 ${log_count}개 정리 완료"
         else
             log_info "정리할 오래된 시스템 로그가 없습니다"
         fi
@@ -320,7 +331,8 @@ fi
 
 # 초기 시스템 상태 기록
 INITIAL_FREE_SPACE=$(get_free_space)
-log_info "초기 여유 공간: $(df -h / | awk 'NR==2 {print $4}')"
+INITIAL_FREE_SPACE_READABLE=$(df -h / | sed -n '2p' | awk '{print $4}')
+log_info "초기 여유 공간: $INITIAL_FREE_SPACE_READABLE"
 
 # 섹션 1: 시스템 개요
 print_section_header "시스템 개요" "1"
@@ -389,7 +401,7 @@ else
             # 스냅샷 개수 계산
             local snapshot_count
             snapshot_count=$(echo "$local_snapshots" | wc -l)
-            log_info "총 $snapshot_count개의 로컬 스냅샷이 있습니다"
+            log_info "총 ${snapshot_count}개의 로컬 스냅샷이 있습니다"
             
             if [[ "$AUTO_CLEAN" == true ]]; then
                 log_info "자동 정리 모드: 로컬 스냅샷 정리 중..."
@@ -587,7 +599,7 @@ else
                 fi
                 
                 # Check for global packages and prune if auto-clean is enabled
-                if [[ "$1" == "--auto-clean" ]]; then
+                if [[ "$AUTO_CLEAN" == "true" ]]; then
                     log_message "Checking for outdated and unused global npm packages..."
                     
                     # Get list of global packages
@@ -633,7 +645,7 @@ if command -v yarn &>/dev/null; then
         
         if [ "$DRY_RUN" = true ]; then
             log_message "DRY RUN: Would clean Yarn cache"
-        elif [[ "$1" == "--auto-clean" ]]; then
+        elif [[ "$AUTO_CLEAN" == "true" ]]; then
             log_message "Auto-cleaning Yarn cache..."
             yarn cache clean 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Yarn cache"
             
@@ -672,7 +684,7 @@ else
         log_message "Found the following large node_modules directories:"
         echo "$large_dirs" | tee -a "$LOG_FILE"
         
-        if [[ "$1" == "--auto-clean" ]]; then
+        if [[ "$AUTO_CLEAN" == "true" ]]; then
             log_message "Checking for unused node_modules (projects not modified in last 90 days)..."
             
             # 검색 범위를 일반적인 프로젝트 디렉토리로 제한
@@ -721,7 +733,7 @@ else
             docker images --filter "dangling=true" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling images found"
             docker ps -a --filter "status=exited" --format "{{.Names}} ({{.Image}})" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No exited containers found"
             docker volume ls --filter "dangling=true" --format "{{.Name}}" 2>/dev/null | tee -a "$LOG_FILE" || log_message "No dangling volumes found"
-        elif [[ "$1" == "--auto-clean" ]]; then
+        elif [[ "$AUTO_CLEAN" == "true" ]]; then
             log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
             
             # 안전하게 실행 (각 명령마다 오류 처리)
@@ -790,7 +802,7 @@ else
                 # Dry run mode - show what would be cleaned
                 log_message "DRY RUN: Would clean OpenWebUI cache files and temporary data"
                 log_message "DRY RUN: Would preserve conversation history and important settings"
-            elif [[ "$1" == "--auto-clean" ]]; then
+            elif [[ "$AUTO_CLEAN" == "true" ]]; then
                 # Auto-clean mode
                 log_message "Auto-cleaning OpenWebUI data (--auto-clean flag detected)..."
                 
@@ -880,7 +892,7 @@ else
                 log_message "OpenWebUI data volume found but container not running"
                 
                 check_volume=""
-                if [[ "$1" == "--auto-clean" ]]; then
+                if [[ "$AUTO_CLEAN" == "true" ]]; then
                     check_volume="y"
                     log_message "Auto-cleaning OpenWebUI volume..."
                 else
@@ -891,7 +903,7 @@ else
                     fi
                 fi
                 
-                if [[ "$check_volume" == "y" || "$check_volume" == "Y" ]]; then
+                if [[ "$check_volume" == "y" ]]; then
                     log_message "Cleaning OpenWebUI data volume even though container is not running..."
                     if docker run --rm -v open-webui_open-webui:/data alpine sh -c "
                         # Remove cache directory
@@ -946,7 +958,7 @@ else
         if [ "$version_count" -gt 1 ]; then
             log_message "Multiple Android Studio versions detected ($version_count versions)"
             
-            if [[ "$1" == "--auto-clean" ]]; then
+            if [[ "$AUTO_CLEAN" == "true" ]]; then
                 log_message "Auto-cleaning old Android Studio data..."
                 # Keep only the latest version (remove all but the newest)
                 latest_version=$(echo "$android_studio_dirs" | sort | tail -n 1)
@@ -978,18 +990,19 @@ else
                         log_message "No old versions to clean"
                     fi
                 else
-                    log_message "Skipping old Android Studio version cleanup"
+                    log_message "Skipping Android Studio version cleanup"
                 fi
             fi
+        else
+            log_message "No Android Studio installations found"
         fi
-    fi
     
     # Clean Android Studio preferences
     as_prefs="$HOME/Library/Preferences/com.google.android.studio.plist"
     if [ -f "$as_prefs" ]; then
         log_message "Found Android Studio preferences file"
         # Check file modification time (cleanup if older than 90 days and auto-clean is enabled)
-        if [[ "$1" == "--auto-clean" ]] && find "$as_prefs" -mtime +90 -print 2>/dev/null | grep -q .; then
+        if [[ "$AUTO_CLEAN" == "true" ]] && find "$as_prefs" -mtime +90 -print 2>/dev/null | grep -q .; then
             log_message "Removing old Android Studio preferences (older than 90 days)"
             rm -f "$as_prefs" 2>/dev/null || log_message "Warning: Could not remove preferences file"
         fi
@@ -999,7 +1012,7 @@ else
     emulator_prefs="$HOME/Library/Preferences/com.android.Emulator.plist"
     if [ -f "$emulator_prefs" ]; then
         log_message "Found Android Emulator preferences file"
-        if [[ "$1" == "--auto-clean" ]] && find "$emulator_prefs" -mtime +90 -print 2>/dev/null | grep -q .; then
+        if [[ "$AUTO_CLEAN" == "true" ]] && find "$emulator_prefs" -mtime +90 -print 2>/dev/null | grep -q .; then
             log_message "Removing old Android Emulator preferences (older than 90 days)"
             rm -f "$emulator_prefs" 2>/dev/null || log_message "Warning: Could not remove emulator preferences"
         fi
@@ -1119,7 +1132,7 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
         log_message "XCode DerivedData size: $derived_size"
         
         if [ "$DRY_RUN" = false ]; then
-            if [[ "$1" == "--auto-clean" ]]; then
+            if [[ "$AUTO_CLEAN" == "true" ]]; then
                 # Auto-clean 모드에서는 바로 정리
                 log_message "Auto-cleaning XCode DerivedData..."
                 if rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null; then
@@ -1156,7 +1169,7 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
         log_message "XCode Archives size: $archives_size"
         
         if [ "$DRY_RUN" = false ]; then 
-            if [[ "$1" == "--auto-clean" ]]; then
+            if [[ "$AUTO_CLEAN" == "true" ]]; then
                 # Auto-clean 모드에서는 바로 정리
                 log_message "Cleaning XCode Archives older than 90 days..."
                 if find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null; then
@@ -1216,7 +1229,7 @@ else
             log_message "Found $total_found .DS_Store files, total size: ${total_size}KB"
         fi
         
-        if [[ "$1" == "--auto-clean" ]]; then
+        if [[ "$AUTO_CLEAN" == "true" ]]; then
             log_message "Auto-cleaning .DS_Store files..."
             if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
                 log_message "Successfully removed .DS_Store files"
@@ -1361,6 +1374,8 @@ echo ""
 echo "For additional options, run: $0 --help"
 echo "Log file saved to: $LOG_FILE"
 echo "=================================================="
+
+fi
 
 # 정상 종료 상태를 반환 (0은 성공을 의미함)
 exit 0

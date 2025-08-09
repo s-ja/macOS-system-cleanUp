@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 # common.sh - 공통 함수 라이브러리
 # macOS 시스템 유지보수 스크립트들을 위한 통합 함수 모음
 
@@ -6,13 +6,25 @@
 # 전역 변수 설정
 # ==============================================
 
+# 안전한 PATH 설정 (시스템 명령어 접근 보장)
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+# 명령어 alias 설정 (확실한 접근 보장)
+alias awk='/usr/bin/awk'
+
 # 스크립트 정보 설정
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh와 bash 모두 호환되는 스크립트 경로 얻기
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LOG_DIR="$PROJECT_ROOT/logs"
 
 # 로그 파일 변수 (각 스크립트에서 설정)
-declare -g LOG_FILE=""
+# declare -g는 Bash 4.2+ 필요, 호환성을 위해 일반 변수로 선언
+LOG_FILE=""
 
 # ==============================================
 # 로깅 시스템
@@ -258,6 +270,18 @@ get_user_input() {
     local valid_options="${3:-}"
     local user_input=""
     
+    # 기본 타임아웃 30초로 get_user_input_with_timeout 호출
+    get_user_input_with_timeout "$1" "$2" "$3" 30
+}
+
+# 타임아웃 지원 사용자 입력 받기
+get_user_input_with_timeout() {
+    local prompt="$1"
+    local default_value="${2:-}"
+    local valid_options="${3:-}"
+    local timeout="${4:-30}"
+    local user_input=""
+    
     # 입력 검증
     if [[ -z "$prompt" ]]; then
         handle_error "get_user_input() requires prompt parameter"
@@ -300,9 +324,10 @@ get_user_input() {
 confirm_action() {
     local prompt="$1"
     local default="${2:-n}"
+    local timeout="${3:-30}"
     local response
     
-    response=$(get_user_input "$prompt (y/n)" "$default" "y n Y N")
+    response=$(get_user_input_with_timeout "$prompt (y/n)" "$default" "y n Y N" "$timeout")
     
     case "$response" in
         [Yy]*)
@@ -370,13 +395,37 @@ check_homebrew_health() {
         return 1
     fi
     
-    # brew doctor 실행으로 상태 확인
-    if brew doctor >/dev/null 2>&1; then
+    # brew doctor 실행으로 상태 확인 (출력 내용 분석)
+    local doctor_output
+    doctor_output=$(brew doctor 2>&1)
+    local doctor_exit_code=$?
+    
+    # 정상 상태 메시지 확인 ("Your system is ready to brew.")
+    if [[ "$doctor_output" == *"Your system is ready to brew"* ]]; then
         return 0
-    else
-        log_warning "Homebrew 상태에 문제가 있습니다"
-        return 1
     fi
+    
+    # PATH 관련 warning만 있는 경우는 정상으로 처리
+    if [[ "$doctor_output" == *"occurs before"* ]] && [[ "$doctor_output" == *"in your PATH"* ]]; then
+        # PATH warning만 있고 다른 critical 오류가 없으면 정상
+        if [[ "$doctor_output" != *"Error:"* ]] && [[ "$doctor_output" != *"Fatal:"* ]]; then
+            return 0
+        fi
+    fi
+    
+    # "please don't worry or file an issue; just ignore this" 메시지가 있으면 정상
+    if [[ "$doctor_output" == *"just ignore this"* ]] && [[ "$doctor_output" != *"Error:"* ]]; then
+        return 0
+    fi
+    
+    # Warning만 있고 치명적인 오류가 없으면 정상으로 처리
+    if [[ "$doctor_output" == *"Warning:"* ]] && [[ "$doctor_output" != *"Error:"* ]] && [[ "$doctor_output" != *"Fatal:"* ]]; then
+        return 0
+    fi
+    
+    # 실제 치명적 오류가 있는 경우만 문제로 판단
+    log_warning "Homebrew 상태에 문제가 있습니다"
+    return 1
 }
 
 # ==============================================
@@ -572,7 +621,7 @@ print_script_start() {
     local script_version="${2:-3.0}"
     
     print_section_header "$script_name v$script_version 시작"
-    log_info "스크립트 시작 시간: $(date)"
+    log_info "스크립트 시작 시간: $(date '+%Y-%m-%d %H:%M:%S')"
     log_info "실행 사용자: $(whoami)"
     log_info "시스템 정보: $(uname -a)"
 }

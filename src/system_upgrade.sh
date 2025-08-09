@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # system_upgrade.sh - Automated System Upgrade Script for macOS
 # v3.0 - Enhanced with improved common library integration
@@ -12,7 +12,12 @@ set -Eeuo pipefail
 IFS=$'\n\t'
 
 # 공통 함수 라이브러리 로드
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# zsh와 bash 모두 호환되는 스크립트 경로 얻기
+if [[ -n "${ZSH_VERSION:-}" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${(%):-%x}")" && pwd)"
+else
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
 source "$SCRIPT_DIR/common.sh" || {
     echo "🛑 FATAL: common.sh를 로드할 수 없습니다"
     exit 1
@@ -331,10 +336,11 @@ else
     # topgrade 실행 (안드로이드 스튜디오 비활성화)
     if command_exists topgrade; then
         log_info "topgrade 실행 중..."
-        if topgrade --disable android_studio --yes 2>/dev/null; then
+        # 타임아웃과 추가 옵션으로 안전하게 실행
+        if timeout 300s topgrade --disable android_studio --disable gem --yes --no-retry 2>/dev/null; then
             log_success "topgrade 실행 완료"
         else
-            handle_error "topgrade 실행 실패"
+            log_warning "topgrade 실행 실패 또는 타임아웃 (일부 항목은 정상 처리되었을 수 있음)"
         fi
     else
         log_warning "topgrade를 사용할 수 없습니다"
@@ -351,7 +357,14 @@ if [[ "$SKIP_ANDROID" == "true" ]]; then
     log_info "안드로이드 스튜디오 업데이트를 건너뜁니다 (--no-android 옵션)"
 elif [[ "$DRY_RUN" == "true" ]]; then
     log_info "DRY RUN: 안드로이드 스튜디오 업데이트 확인 예정"
-    if command_exists studio || command_exists android-studio; then
+    if command_exists studio || command_exists android-studio || [[ -d "/Applications/Android Studio.app" ]]; then
+        # DRY RUN에서도 현재 버전 표시
+        if command_exists brew; then
+            current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
+            if [[ -n "$current_version" ]]; then
+                log_info "DRY RUN: 현재 안드로이드 스튜디오 버전: $current_version"
+            fi
+        fi
         log_info "DRY RUN: 안드로이드 스튜디오가 설치되어 있음"
         log_info "DRY RUN: brew upgrade --cask android-studio 실행 예정"
     else
@@ -360,12 +373,29 @@ elif [[ "$DRY_RUN" == "true" ]]; then
 else
     log_info "안드로이드 스튜디오 업데이트를 확인합니다..."
 
-    if command_exists studio || command_exists android-studio; then
-        # 현재 버전 확인
+    if command_exists studio || command_exists android-studio || [[ -d "/Applications/Android Studio.app" ]]; then
+        # 현재 버전 확인 (개선된 방법)
         if command_exists brew; then
-            current_version=$(brew info --cask android-studio 2>/dev/null | grep "Installed" | awk '{print $2}' | tr -d '()')
+            # brew info 출력에서 버전 정보 추출 (여러 방법 시도)
+            current_version=""
+            
+            # 방법 1: 첫 번째 줄에서 버전 추출 (예: android-studio: 2025.1.2.11)
+            current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
+            
+            # 방법 2: Caskroom 경로에서 버전 추출 (fallback)
+            if [[ -z "$current_version" ]]; then
+                current_version=$(brew info --cask android-studio 2>/dev/null | grep "Caskroom" | grep -o '[0-9][0-9.]*[0-9]' | head -1)
+            fi
+            
+            # 방법 3: 일반적인 버전 패턴 검색 (fallback)
+            if [[ -z "$current_version" ]]; then
+                current_version=$(brew info --cask android-studio 2>/dev/null | grep -o '[0-9]\{4\}\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+            fi
+            
             if [[ -n "$current_version" ]]; then
                 log_info "현재 안드로이드 스튜디오 버전: $current_version"
+            else
+                log_info "안드로이드 스튜디오가 설치되어 있지만 버전 정보를 가져올 수 없습니다"
             fi
         fi
         
@@ -374,7 +404,7 @@ else
         if [[ "$AUTO_YES" == "true" ]]; then
             should_update=true
             log_info "자동 확인 모드: 안드로이드 스튜디오 업데이트 진행"
-        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "n"; then
+        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "y" 30; then
             should_update=true
         fi
         
@@ -448,7 +478,12 @@ elif command_exists brew; then
             app_name="${app#./}"
             app_name="${app_name%.app}"
             cask_name="${app_name// /-}"
-            cask_name="${cask_name,,}"  # 소문자로 변환
+            # zsh와 bash 모두 호환되는 소문자 변환
+            if [[ -n "${ZSH_VERSION:-}" ]]; then
+                cask_name="${(L)cask_name}"
+            else
+                cask_name="${cask_name,,}"
+            fi
             
             # 설치 가능한 Cask 목록에 있는지 확인
             if [[ -f "$AVAILABLE_CASKS" ]] && grep -Fxq "$cask_name" "$AVAILABLE_CASKS" 2>/dev/null; then
@@ -481,7 +516,7 @@ elif command_exists brew; then
         if [[ "$AUTO_YES" == "true" ]]; then
             should_install=true
             log_info "자동 확인 모드: 발견된 앱들을 설치합니다"
-        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "n"; then
+        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "y" 30; then
             should_install=true
         fi
         
