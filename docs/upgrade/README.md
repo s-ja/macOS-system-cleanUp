@@ -4,19 +4,16 @@
 
 ## Overview
 
-`system_upgrade.sh` is an automated upgrade script designed to keep your macOS system's packages and applications up to date. This script manages updates for Homebrew, Cask, and the entire system with enhanced stability and error recovery features.
+`system_upgrade.sh` is an automated upgrade script designed to keep your macOS system's packages and applications up to date. This script manages updates for Homebrew, Cask, and the entire system.
 
 ## Features
 
 - Automatic Homebrew and Cask updates
 - Full system updates via topgrade
 - Automatic detection of Homebrew Cask-compatible apps
-- Enhanced Android Studio management (separate from topgrade)
 - Detailed logging system
-- Improved error handling and recovery
+- Error handling and recovery
 - Automatic temporary file management
-- Enhanced permission validation
-- Robust directory handling
 
 ## Quick Start
 
@@ -37,23 +34,6 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
-<<<<<<< HEAD
-## Recent Improvements (v3.0)
-
-- **New Options**: Added `--help`, `--dry-run`, and `--auto-yes`
-- **Granular Skips**: `--no-brew`, `--no-cask`, `--no-topgrade`, `--no-android`, `--no-apps`
-- **Unified UI**: Standardized headers and dividers across all sections
-- **Safe Operations**: Protected path system and safe file helpers for destructive commands
-=======
-## Recent Improvements (v3.1)
-
-- **Cross-shell Compatibility**: Works perfectly with both zsh and bash
-- **Cross-shell String Processing**: Automatic selection of shell-specific syntax for case conversion
-- **Runtime Shell Detection**: Dynamic feature selection via `ZSH_VERSION` variable
-- **Backward Compatibility**: Existing bash users can continue using without changes
-- **New Options**: Added `--help`, `--dry-run`, and `--auto-yes`
->>>>>>> bc475dc26d6de204561fa8d5e6778fbb2f2c48ca
-
 ## Safety Features
 
 - System state verification
@@ -61,7 +41,6 @@ For version history and changes, see [Changelog](CHANGELOG.md).
 - Permission validation
 - Error recovery mechanisms
 - Automatic rollback for failed updates
-- Safe temporary directory handling
 
 ## Requirements
 
