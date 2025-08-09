@@ -1,4 +1,4 @@
-#!/bin/zsh
+#!/bin/bash
 
 # system_upgrade.sh - Automated System Upgrade Script for macOS
 # v3.0 - Enhanced with improved common library integration
@@ -356,7 +356,14 @@ if [[ "$SKIP_ANDROID" == "true" ]]; then
     log_info "안드로이드 스튜디오 업데이트를 건너뜁니다 (--no-android 옵션)"
 elif [[ "$DRY_RUN" == "true" ]]; then
     log_info "DRY RUN: 안드로이드 스튜디오 업데이트 확인 예정"
-    if command_exists studio || command_exists android-studio; then
+    if command_exists studio || command_exists android-studio || [[ -d "/Applications/Android Studio.app" ]]; then
+        # DRY RUN에서도 현재 버전 표시
+        if command_exists brew; then
+            current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
+            if [[ -n "$current_version" ]]; then
+                log_info "DRY RUN: 현재 안드로이드 스튜디오 버전: $current_version"
+            fi
+        fi
         log_info "DRY RUN: 안드로이드 스튜디오가 설치되어 있음"
         log_info "DRY RUN: brew upgrade --cask android-studio 실행 예정"
     else
@@ -365,12 +372,29 @@ elif [[ "$DRY_RUN" == "true" ]]; then
 else
     log_info "안드로이드 스튜디오 업데이트를 확인합니다..."
 
-    if command_exists studio || command_exists android-studio; then
-        # 현재 버전 확인
+    if command_exists studio || command_exists android-studio || [[ -d "/Applications/Android Studio.app" ]]; then
+        # 현재 버전 확인 (개선된 방법)
         if command_exists brew; then
-            current_version=$(brew info --cask android-studio 2>/dev/null | grep "Installed" | awk '{print $2}' | tr -d '()')
+            # brew info 출력에서 버전 정보 추출 (여러 방법 시도)
+            current_version=""
+            
+            # 방법 1: 첫 번째 줄에서 버전 추출 (예: android-studio: 2025.1.2.11)
+            current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
+            
+            # 방법 2: Caskroom 경로에서 버전 추출 (fallback)
+            if [[ -z "$current_version" ]]; then
+                current_version=$(brew info --cask android-studio 2>/dev/null | grep "Caskroom" | grep -o '[0-9][0-9.]*[0-9]' | head -1)
+            fi
+            
+            # 방법 3: 일반적인 버전 패턴 검색 (fallback)
+            if [[ -z "$current_version" ]]; then
+                current_version=$(brew info --cask android-studio 2>/dev/null | grep -o '[0-9]\{4\}\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+            fi
+            
             if [[ -n "$current_version" ]]; then
                 log_info "현재 안드로이드 스튜디오 버전: $current_version"
+            else
+                log_info "안드로이드 스튜디오가 설치되어 있지만 버전 정보를 가져올 수 없습니다"
             fi
         fi
         
@@ -379,7 +403,7 @@ else
         if [[ "$AUTO_YES" == "true" ]]; then
             should_update=true
             log_info "자동 확인 모드: 안드로이드 스튜디오 업데이트 진행"
-        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "n"; then
+        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "y"; then
             should_update=true
         fi
         
@@ -491,7 +515,7 @@ elif command_exists brew; then
         if [[ "$AUTO_YES" == "true" ]]; then
             should_install=true
             log_info "자동 확인 모드: 발견된 앱들을 설치합니다"
-        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "n"; then
+        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "y"; then
             should_install=true
         fi
         
