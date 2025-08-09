@@ -210,7 +210,7 @@ clean_user_caches() {
     space_saved_formatted=$(calculate_space_saved "$space_before" "$space_after")
     
     if [[ $cleaned_count -gt 0 ]]; then
-        log_success "사용자 캐시 정리 완료 ($cleaned_count개 카테고리). 절약된 공간: $space_saved_formatted"
+        log_success "사용자 캐시 정리 완료 (${cleaned_count}개 카테고리). 절약된 공간: $space_saved_formatted"
     else
         log_info "정리할 사용자 캐시가 없습니다"
     fi
@@ -328,7 +328,8 @@ fi
 
 # 초기 시스템 상태 기록
 INITIAL_FREE_SPACE=$(get_free_space)
-log_info "초기 여유 공간: $(df -h / | awk 'NR==2 {print $4}')"
+INITIAL_FREE_SPACE_READABLE=$(df -h / | sed -n '2p' | awk '{print $4}')
+log_info "초기 여유 공간: $INITIAL_FREE_SPACE_READABLE"
 
 # 섹션 1: 시스템 개요
 print_section_header "시스템 개요" "1"

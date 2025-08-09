@@ -336,10 +336,11 @@ else
     # topgrade 실행 (안드로이드 스튜디오 비활성화)
     if command_exists topgrade; then
         log_info "topgrade 실행 중..."
-        if topgrade --disable android_studio --yes 2>/dev/null; then
+        # 타임아웃과 추가 옵션으로 안전하게 실행
+        if timeout 300s topgrade --disable android_studio --disable gem --yes --no-retry 2>/dev/null; then
             log_success "topgrade 실행 완료"
         else
-            handle_error "topgrade 실행 실패"
+            log_warning "topgrade 실행 실패 또는 타임아웃 (일부 항목은 정상 처리되었을 수 있음)"
         fi
     else
         log_warning "topgrade를 사용할 수 없습니다"
