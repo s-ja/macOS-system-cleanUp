@@ -9,6 +9,9 @@
 # 안전한 PATH 설정 (시스템 명령어 접근 보장)
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
+# 명령어 alias 설정 (확실한 접근 보장)
+alias awk='/usr/bin/awk'
+
 # 스크립트 정보 설정
 # zsh와 bash 모두 호환되는 스크립트 경로 얻기
 if [[ -n "${ZSH_VERSION:-}" ]]; then
