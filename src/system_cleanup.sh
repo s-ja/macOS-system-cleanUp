@@ -12,6 +12,9 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
+# 안전한 PATH 설정 (시스템 명령어 접근 보장)
+export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 # 공통 함수 라이브러리 로드
 # zsh와 bash 모두 호환되는 스크립트 경로 얻기
 if [[ -n "${ZSH_VERSION:-}" ]]; then
