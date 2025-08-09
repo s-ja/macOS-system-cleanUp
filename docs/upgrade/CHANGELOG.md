@@ -1,5 +1,19 @@
 # Changelog - System Upgrade Utility
 
+## [v3.0] - 2024-12-28
+
+### 추가/Added
+
+- `--help`, `--dry-run`, `--auto-yes` 옵션 추가
+- 세분화된 스킵 옵션: `--no-brew`, `--no-cask`, `--no-topgrade`, `--no-android`, `--no-apps`
+- 표준화된 UI 함수 적용
+- 안전한 파일 작업 함수(safe_remove 등) 도입
+
+### 개선/Improved
+
+- 중요 시스템 경로 보호 로직 강화
+- 사용자 확인 시스템 및 DRY RUN 경고 개선
+
 ## [v2.6] - 2025-06-26
 
 ### 개선/Improved

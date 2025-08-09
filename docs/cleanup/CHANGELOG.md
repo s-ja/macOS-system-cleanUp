@@ -1,5 +1,17 @@
 # Changelog - System Cleanup Utility
 
+## [v3.0] - 2024-12-28
+
+### 추가/Added
+
+- 표준화된 UI 함수(`print_section_header`, `print_section_divider` 등) 도입
+- 안전한 파일 작업 함수(`safe_remove`, `safe_clear_cache`, `create_backup`) 추가
+
+### 개선/Improved
+
+- 중요 시스템 경로 보호 로직 강화
+- DRY RUN 경고 및 작업 요약 출력 통일
+
 ## [v2.6] - 2025-05-31
 
 ### 개선/Improved
