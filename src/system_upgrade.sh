@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 # system_upgrade.sh - Automated System Upgrade Script for macOS
 # v3.0 - Enhanced with improved common library integration
