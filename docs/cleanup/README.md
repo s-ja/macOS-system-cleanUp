@@ -41,14 +41,12 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
-## Recent Improvements (v2.6)
+## Recent Improvements (v3.0)
 
-- **Enhanced Stability**: Improved overall script stability and functionality
-- **Better Error Handling**: Strengthened error handling mechanisms throughout the script
-- **Improved Logging**: Enhanced logging system for better debugging and monitoring
-- **Performance Optimization**: Various performance improvements for faster execution
-- **Compatibility**: Better compatibility across different system environments
-- **Permission Handling**: Improved permission-related error handling
+- **Unified UI**: Standardized section headers and dividers across all messages
+- **Safe Operations**: Added `safe_remove`, `safe_clear_cache`, and `create_backup` helpers
+- **Protected Paths**: Critical system directories are now guarded against accidental deletion
+- **Consistent DRY RUN**: Unified warning and summary output when using `--dry-run`
 
 ## Command Line Options
 

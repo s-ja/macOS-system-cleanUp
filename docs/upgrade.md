@@ -36,7 +36,7 @@ For detailed installation instructions, see [Installation Guide](installation.md
 
 For troubleshooting, see [Troubleshooting Guide](troubleshooting.md#upgrade).
 
-For version history and changes, see [Changelog](../CHANGELOG.md).
+For version history and changes, see [Changelog](upgrade/CHANGELOG.md).
 
 ### Safety Features
 
@@ -96,7 +96,7 @@ MIT License - see LICENSE file for details.
 
 문제 해결은 [문제 해결 가이드](troubleshooting.md#upgrade)를 참조하세요.
 
-버전 기록과 변경사항은 [변경 이력](../CHANGELOG.md)을 참조하세요.
+버전 기록과 변경사항은 [변경 이력](upgrade/CHANGELOG.md)을 참조하세요.
 
 ### 안전 기능
 
