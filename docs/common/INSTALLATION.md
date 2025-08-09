@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - macOS operating system
-- Bash shell
+- Bash or zsh shell (both supported)
 - Homebrew package manager
 - Internet connection
 
@@ -52,7 +52,17 @@ Ensure proper permissions for:
    ```
 
 3. Configure shell environment:
+
+   **For zsh users:**
+
    ```bash
    echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.zshrc
    source ~/.zshrc
+   ```
+
+   **For bash users:**
+
+   ```bash
+   echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.bash_profile
+   source ~/.bash_profile
    ```

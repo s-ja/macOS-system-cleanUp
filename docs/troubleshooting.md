@@ -8,6 +8,53 @@
 
 ### Common Issues
 
+#### Shell Compatibility Issues
+
+##### Script Fails with "declare: -g: invalid option"
+
+```bash
+declare: -g: invalid option
+declare: usage: declare [-afFirtx] [-p] [name[=value] ...]
+```
+
+**Solutions**:
+
+1. Check your shell version:
+   ```bash
+   bash --version
+   zsh --version
+   ```
+2. Use zsh instead of old bash:
+   ```bash
+   zsh src/system_upgrade.sh --help
+   ```
+3. Update to newer bash via Homebrew:
+   ```bash
+   brew install bash
+   /usr/local/bin/bash src/system_upgrade.sh --help
+   ```
+
+##### Shell-specific Syntax Errors
+
+```bash
+bad substitution
+```
+
+**Solutions**:
+
+1. Ensure you're using a compatible shell:
+
+   ```bash
+   # Check current shell
+   echo $0
+
+   # Run with specific shell
+   zsh src/system_cleanup.sh
+   bash src/system_cleanup.sh
+   ```
+
+2. The scripts auto-detect shell features, but you can force a specific shell if needed
+
 <a id="cleanup"></a>
 
 #### System Cleanup Utility Issues
@@ -342,4 +389,111 @@ If you encounter unlisted issues:
 
 ## 한국어
 
-(Korean version will be added later)
+### 일반적인 문제
+
+#### 쉘 호환성 문제
+
+##### "declare: -g: invalid option" 오류로 스크립트 실패
+
+```bash
+declare: -g: invalid option
+declare: usage: declare [-afFirtx] [-p] [name[=value] ...]
+```
+
+**해결 방법**:
+
+1. 쉘 버전 확인:
+   ```bash
+   bash --version
+   zsh --version
+   ```
+2. 오래된 bash 대신 zsh 사용:
+   ```bash
+   zsh src/system_upgrade.sh --help
+   ```
+3. Homebrew를 통해 최신 bash로 업데이트:
+   ```bash
+   brew install bash
+   /usr/local/bin/bash src/system_upgrade.sh --help
+   ```
+
+##### 쉘별 문법 오류
+
+```bash
+bad substitution
+```
+
+**해결 방법**:
+
+1. 호환 가능한 쉘 사용 확인:
+
+   ```bash
+   # 현재 쉘 확인
+   echo $0
+
+   # 특정 쉘로 실행
+   zsh src/system_cleanup.sh
+   bash src/system_cleanup.sh
+   ```
+
+2. 스크립트가 쉘 기능을 자동 감지하지만 필요시 특정 쉘 강제 지정 가능
+
+#### 시스템 정리 유틸리티 문제
+
+##### 권한 오류
+
+```bash
+ERROR: Permission denied
+```
+
+**해결 방법**:
+
+1. 스크립트 권한 확인:
+   ```bash
+   chmod +x src/cleanup/system_cleanup.sh
+   ```
+2. 디렉토리 권한 확인:
+   ```bash
+   ls -la ~/Library/Caches
+   ls -la /Library/Caches  # sudo 필요
+   ```
+
+#### 시스템 업그레이드 유틸리티 문제
+
+##### Ruby 버전 문제
+
+```bash
+ERROR: Ruby version >= 3.2.0 is required
+```
+
+**해결 방법**:
+
+1. 현재 Ruby 버전 확인:
+   ```bash
+   ruby -v
+   ```
+2. Homebrew로 Ruby 업데이트:
+   ```bash
+   brew upgrade ruby
+   ```
+
+### 예방 팁
+
+1. 항상 먼저 `--dry-run` 또는 `--check-only` 사용
+2. 중요 데이터 백업 유지
+3. 스크립트 실행 전 애플리케이션 종료
+4. 적절한 플래그로 민감한 영역 건너뛰기
+5. 디스크 공간 정기 모니터링
+6. 깔끔한 Homebrew 설치 상태 유지
+
+### 도움 받기
+
+목록에 없는 문제의 경우:
+
+1. `~/logs`의 로그 확인
+2. `--dry-run` 또는 `--verbose` 옵션으로 실행
+3. 이슈 보고 시 포함할 내용:
+   - 오류 메시지
+   - 시스템 정보
+   - 재현 단계
+   - 관련 로그 파일

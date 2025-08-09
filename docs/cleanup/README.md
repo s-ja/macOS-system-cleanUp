@@ -41,12 +41,13 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
-## Recent Improvements (v3.0)
+## Recent Improvements (v3.1)
 
+- **Cross-shell Compatibility**: Works perfectly with both zsh and bash
+- **Runtime Shell Detection**: Automatically selects appropriate shell features when running
+- **Backward Compatibility**: Existing bash users can continue using without changes
 - **Unified UI**: Standardized section headers and dividers across all messages
 - **Safe Operations**: Added `safe_remove`, `safe_clear_cache`, and `create_backup` helpers
-- **Protected Paths**: Critical system directories are now guarded against accidental deletion
-- **Consistent DRY RUN**: Unified warning and summary output when using `--dry-run`
 
 ## Command Line Options
 
