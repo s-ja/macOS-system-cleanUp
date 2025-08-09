@@ -4,19 +4,16 @@
 
 ## Overview
 
-`system_upgrade.sh` is an automated upgrade script designed to keep your macOS system's packages and applications up to date. This script manages updates for Homebrew, Cask, and the entire system with enhanced stability and error recovery features.
+`system_upgrade.sh` is an automated upgrade script designed to keep your macOS system's packages and applications up to date. This script manages updates for Homebrew, Cask, and the entire system.
 
 ## Features
 
 - Automatic Homebrew and Cask updates
 - Full system updates via topgrade
 - Automatic detection of Homebrew Cask-compatible apps
-- Enhanced Android Studio management (separate from topgrade)
 - Detailed logging system
-- Improved error handling and recovery
+- Error handling and recovery
 - Automatic temporary file management
-- Enhanced permission validation
-- Robust directory handling
 
 ## Quick Start
 
@@ -37,14 +34,6 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
-## Recent Improvements (v2.6)
-
-- **Enhanced Directory Management**: Improved temporary directory creation with proper permission handling
-- **Android Studio Separation**: Android Studio is now managed separately from topgrade for better control
-- **Better Error Recovery**: More detailed error messages with specific recovery instructions
-- **Code Organization**: Added section dividers and improved code structure for better maintainability
-- **Performance Optimization**: Optimized file search and processing logic
-
 ## Safety Features
 
 - System state verification
@@ -52,7 +41,6 @@ For version history and changes, see [Changelog](CHANGELOG.md).
 - Permission validation
 - Error recovery mechanisms
 - Automatic rollback for failed updates
-- Safe temporary directory handling
 
 ## Requirements
 
