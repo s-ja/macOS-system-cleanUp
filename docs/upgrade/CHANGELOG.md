@@ -1,5 +1,27 @@
 # Changelog - System Upgrade Utility
 
+## [v2.7] - 2025-08-22
+
+### 주요 개선/Major Improvements
+
+- **homebrew-cask-upgrade 플러그인 완전 제거**: Homebrew 4.x 호환성 문제 해결
+- **update_casks() 함수 구현**: 안정적인 개별 Cask 업데이트 시스템
+- **Git merge conflict 해결**: 코드 일관성 및 가독성 향상
+
+### 개선/Improved
+
+- Cask 업데이트 로직 단순화 및 안정성 향상
+- 플러그인 의존성 제거로 실행 속도 개선
+- 코드 복잡성 대폭 감소 (~30줄 감소)
+- 에러 처리 및 복구 메커니즘 개선
+
+### 수정/Fixed
+
+- `ohai` 메서드 오류로 인한 Cask 업데이트 실패 문제 완전 해결
+- 불필요한 플러그인 설치/제거 과정 제거
+- 중복된 안드로이드 스튜디오 확인 코드 통합
+- 임시 파일 정리 함수 호출 문제 해결
+
 ## [v2.6] - 2025-06-26
 
 ### 개선/Improved

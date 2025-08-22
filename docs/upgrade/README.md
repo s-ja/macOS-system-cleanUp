@@ -37,7 +37,14 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
-## Recent Improvements (v2.6)
+## Recent Improvements (v2.7)
+
+- **Complete Removal of homebrew-cask-upgrade Plugin**: Resolved Homebrew 4.x compatibility issues for significantly improved stability
+- **update_casks() Function Implementation**: Stable individual Cask update system for better control and monitoring
+- **Dramatic Code Complexity Reduction**: Removed plugin dependencies, reducing code by ~30 lines and improving readability
+- **Git Merge Conflict Resolution**: Ensured code consistency and eliminated duplication
+
+## Previous Improvements (v2.6)
 
 - **Enhanced Directory Management**: Improved temporary directory creation with proper permission handling
 - **Android Studio Separation**: Android Studio is now managed separately from topgrade for better control
