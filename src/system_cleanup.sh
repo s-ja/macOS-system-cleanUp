@@ -307,17 +307,12 @@ else
             log_message "Found the following local snapshots:"
             echo "$local_snapshots" | tee -a "$LOG_FILE"
             
-<<<<<<< HEAD
             # 스냅샷 개수 계산
             snapshot_count=$(echo "$local_snapshots" | wc -l)
-            log_info "총 ${snapshot_count}개의 로컬 스냅샷이 있습니다"
+            log_message "총 ${snapshot_count}개의 로컬 스냅샷이 있습니다"
             
             if [[ "$AUTO_CLEAN" == true ]]; then
-                log_info "자동 정리 모드: 로컬 스냅샷 정리 중..."
-=======
-            if [ "$AUTO_CLEAN" = true ]; then
-                log_message "Auto-cleaning local snapshots..."
->>>>>>> origin/main
+                log_message "자동 정리 모드: 로컬 스냅샷 정리 중..."
                 if ! clean_time_machine_snapshots; then
                     log_message "⚠️ Warning: Failed to clean Time Machine snapshots, but continuing..."
                 fi
@@ -1255,7 +1250,7 @@ fi
 
 log_message "========================================="
 log_message "System cleanup completed. Log saved to: $LOG_FILE"
-log_message "End time: $(date)"
+log_message "End time: $(date '+%Y-%m-%d %H:%M:%S')"
 log_message "========================================="
 
 # Provide some user guidance
