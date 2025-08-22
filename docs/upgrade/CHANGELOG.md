@@ -1,22 +1,5 @@
 # Changelog - System Upgrade Utility
 
-## [v3.0] - 2024-12-28
-
-### 추가/Added
-
-- `--help`, `--dry-run`, `--auto-yes` 옵션 추가
-- 세분화된 스킵 옵션: `--no-brew`, `--no-cask`, `--no-topgrade`, `--no-android`, `--no-apps`
-- 표준화된 UI 함수 적용
-- 안전한 파일 작업 함수(safe_remove 등) 도입
-
-### 개선/Improved
-
-- 중요 시스템 경로 보호 로직 강화
-- 사용자 확인 시스템 및 DRY RUN 경고 개선
-- 안드로이드 스튜디오 버전 감지를 다중 Fallback 방식으로 강화하고 설치 경로를 직접 확인
-- 안드로이드 스튜디오 업데이트 프롬프트 기본값을 'y'로 변경하고 DRY RUN에서도 현재 버전을 표시
-- 변수 범위와 트랩 인용을 정리해 ShellCheck 오류를 제거하고 스크립트 안정성을 강화
-
 ## [v2.6] - 2025-06-26
 
 ### 개선/Improved

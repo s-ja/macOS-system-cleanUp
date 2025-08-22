@@ -37,12 +37,13 @@ For troubleshooting, see [Troubleshooting Guide](TROUBLESHOOTING.md).
 
 For version history and changes, see [Changelog](CHANGELOG.md).
 
-## Recent Improvements (v3.0)
+## Recent Improvements (v2.6)
 
-- **New Options**: Added `--help`, `--dry-run`, and `--auto-yes`
-- **Granular Skips**: `--no-brew`, `--no-cask`, `--no-topgrade`, `--no-android`, `--no-apps`
-- **Unified UI**: Standardized headers and dividers across all sections
-- **Safe Operations**: Protected path system and safe file helpers for destructive commands
+- **Enhanced Directory Management**: Improved temporary directory creation with proper permission handling
+- **Android Studio Separation**: Android Studio is now managed separately from topgrade for better control
+- **Better Error Recovery**: More detailed error messages with specific recovery instructions
+- **Code Organization**: Added section dividers and improved code structure for better maintainability
+- **Performance Optimization**: Optimized file search and processing logic
 
 ## Safety Features
 

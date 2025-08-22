@@ -70,28 +70,6 @@ Error: Cask 'app-name' is not installed
    brew tap --repair
    ```
 
-### Android Studio Detection Problems
-
-```bash
-INFO: 현재 안드로이드 스튜디오 버전:
-```
-
-**Solutions**:
-
-1. 설치 여부 확인:
-   ```bash
-   ls "/Applications/Android Studio.app"
-   ```
-2. 버전 정보 확인:
-   ```bash
-   brew info --cask android-studio | head -1
-   ```
-3. 최신 스크립트를 사용하면 확인 프롬프트 기본값이 'y'이므로 엔터 키만 눌러도 업데이트가 진행됩니다.
-4. 업데이트를 건너뛰려면:
-   ```bash
-   ./src/upgrade/system_upgrade.sh --no-android
-   ```
-
 ### Permission Problems
 
 ```bash

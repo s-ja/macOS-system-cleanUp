@@ -5,7 +5,7 @@
 ## 필수 조건
 
 - macOS 운영 체제
-- Bash 또는 zsh 쉘 (둘 다 지원)
+- Bash 쉘
 - Homebrew 패키지 관리자
 - 인터넷 연결
 
@@ -54,19 +54,9 @@
    ```
 
 3. 쉘 환경 설정:
-
-   **zsh 사용자:**
-
    ```bash
    echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.zshrc
    source ~/.zshrc
-   ```
-
-   **bash 사용자:**
-
-   ```bash
-   echo 'export PATH="/usr/local/opt/ruby/bin:$PATH"' >> ~/.bash_profile
-   source ~/.bash_profile
    ```
 
 ## 설치 확인
