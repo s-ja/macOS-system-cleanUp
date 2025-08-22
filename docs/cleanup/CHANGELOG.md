@@ -1,5 +1,19 @@
 # Changelog - System Cleanup Utility
 
+## [v3.0] - 2024-12-28
+
+### 추가/Added
+
+- 표준화된 UI 함수(`print_section_header`, `print_section_divider` 등) 도입
+- 안전한 파일 작업 함수(`safe_remove`, `safe_clear_cache`, `create_backup`) 추가
+
+### 개선/Improved
+
+- 중요 시스템 경로 보호 로직 강화
+- DRY RUN 경고 및 작업 요약 출력 통일
+- PATH 환경변수와 날짜 형식을 표준화해 zsh 환경에서도 기본 명령어와 로그 타임스탬프가 올바르게 출력되도록 개선
+- 변수 범위와 인용을 정리해 ShellCheck 경고를 제거하고 스크립트 안정성 향상
+
 ## [v2.6] - 2025-05-31
 
 ### 개선/Improved
@@ -25,7 +39,6 @@
 ### 개선/Improved
 
 - 시스템 정리 스크립트 안정성 대폭 개선
-- 타임아웃 처리를 통한 무한 실행 방지
 - 모든 섹션에 오류 복구 및 계속 진행 로직 추가
 - 스크립트 중단 시 자원 정리를 위한 트랩 핸들러 구현
 - 복잡한 조건문 구조 단순화 및 가독성 개선

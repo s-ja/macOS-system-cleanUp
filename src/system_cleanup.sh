@@ -335,14 +335,20 @@ if [[ "$DRY_RUN" == "true" ]]; then
     log_info "DRY RUN: 시스템 및 사용자 캐시 정리 시뮬레이션"
     log_info "DRY RUN: 실제 정리 없이 정리 대상만 확인합니다"
 else
-    # 사용자 레벨 캐시 정리 (항상 실행)
-    if ! clean_user_caches; then
-        log_warning "사용자 캐시 정리에 문제가 있었지만 계속 진행합니다..."
+    if [[ "$AUTO_CLEAN" == "true" ]] || confirm_action "사용자 캐시를 정리하시겠습니까?" "y"; then
+        if ! clean_user_caches; then
+            log_warning "사용자 캐시 정리에 문제가 있었지만 계속 진행합니다..."
+        fi
+    else
+        log_info "사용자 캐시 정리를 건너뜁니다"
     fi
-    
-    # sudo 권한이 있는 경우 시스템 레벨 정리 시도
-    if ! clean_system_caches; then
-        log_warning "시스템 캐시 정리에 문제가 있었지만 계속 진행합니다..."
+
+    if [[ "$AUTO_CLEAN" == "true" ]] || confirm_action "시스템 캐시를 정리하시겠습니까?" "y"; then
+        if ! clean_system_caches; then
+            log_warning "시스템 캐시 정리에 문제가 있었지만 계속 진행합니다..."
+        fi
+    else
+        log_info "시스템 캐시 정리를 건너뜁니다"
     fi
 fi
 
@@ -381,7 +387,6 @@ else
             echo "$local_snapshots" | tee -a "$LOG_FILE"
             
             # 스냅샷 개수 계산
-            local snapshot_count
             snapshot_count=$(echo "$local_snapshots" | wc -l)
             log_info "총 $snapshot_count개의 로컬 스냅샷이 있습니다"
             
@@ -437,28 +442,34 @@ clean_homebrew() {
     local space_before
     space_before=$(get_free_space)
     
-    # Homebrew 및 패키지 업데이트
-    log_info "Homebrew 및 설치된 패키지 업데이트 중..."
-    if HOMEBREW_NO_AUTO_UPDATE=1 brew update 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "Homebrew 업데이트 완료"
+    if confirm_action "Homebrew 및 설치된 패키지를 업데이트하시겠습니까?" "y"; then
+        log_info "Homebrew 및 설치된 패키지 업데이트 중..."
+        if HOMEBREW_NO_AUTO_UPDATE=1 brew update 2>&1 | tee -a "$LOG_FILE"; then
+            log_success "Homebrew 업데이트 완료"
+        else
+            handle_error "Homebrew 업데이트 실패"
+            return 1
+        fi
+
+        if HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade 2>&1 | tee -a "$LOG_FILE"; then
+            log_success "패키지 업그레이드 완료"
+        else
+            handle_error "패키지 업그레이드 실패"
+            return 1
+        fi
     else
-        handle_error "Homebrew 업데이트 실패"
-        return 1
+        log_info "Homebrew 업데이트를 건너뜁니다"
     fi
     
-    if HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "패키지 업그레이드 완료"
+    if confirm_action "brew doctor를 실행하여 잠재적 문제를 확인하시겠습니까?" "y"; then
+        log_info "brew doctor를 실행하여 잠재적 문제를 확인합니다..."
+        if brew doctor 2>&1 | tee -a "$LOG_FILE"; then
+            log_success "brew doctor 검사 통과"
+        else
+            log_warning "brew doctor 검사에서 문제를 발견했지만 계속 진행합니다"
+        fi
     else
-        handle_error "패키지 업그레이드 실패"
-        return 1
-    fi
-    
-    # brew doctor 실행
-    log_info "brew doctor를 실행하여 잠재적 문제를 확인합니다..."
-    if brew doctor 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "brew doctor 검사 통과"
-    else
-        log_warning "brew doctor 검사에서 문제를 발견했지만 계속 진행합니다"
+        log_info "brew doctor 실행을 건너뜁니다"
     fi
     
     # 오래된 패키지 확인
@@ -480,8 +491,8 @@ clean_homebrew() {
         log_info "사용하지 않는 의존성:"
         echo "$unused_deps" | tee -a "$LOG_FILE"
         
-        if [[ "$auto_clean_mode" == "true" ]]; then
-            log_info "자동 정리 모드: 사용하지 않는 의존성 제거 중..."
+        if [[ "$auto_clean_mode" == "true" ]] || confirm_action "사용하지 않는 의존성을 제거하시겠습니까?" "n"; then
+            log_info "사용하지 않는 의존성 제거 중..."
             if brew autoremove 2>&1 | tee -a "$LOG_FILE"; then
                 log_success "사용하지 않는 의존성 제거 완료"
             else
@@ -492,13 +503,16 @@ clean_homebrew() {
         log_success "사용하지 않는 의존성이 없습니다"
     fi
     
-    # Homebrew 캐시 및 오래된 버전 정리
-    log_info "Homebrew 캐시 및 오래된 버전 정리 중..."
-    if brew cleanup --prune=all 2>&1 | tee -a "$LOG_FILE"; then
-        log_success "Homebrew 정리 완료"
+    if confirm_action "Homebrew 캐시 및 오래된 버전을 정리하시겠습니까?" "y"; then
+        log_info "Homebrew 캐시 및 오래된 버전 정리 중..."
+        if brew cleanup --prune=all 2>&1 | tee -a "$LOG_FILE"; then
+            log_success "Homebrew 정리 완료"
+        else
+            handle_error "Homebrew 정리 실패"
+            return 1
+        fi
     else
-        handle_error "Homebrew 정리 실패"
-        return 1
+        log_info "Homebrew 캐시 정리를 건너뜁니다"
     fi
     
     # 결과 계산
@@ -527,14 +541,15 @@ else
             log_message "DRY RUN: Would remove unused dependencies"
             log_message "DRY RUN: Would clean up Homebrew cache and old versions"
         else
-            # Call the cleanup function
-            if ! clean_homebrew "$1"; then
-                log_message "⚠️ Warning: Some Homebrew cleanup operations failed, but continuing..."
+            if [[ "$AUTO_CLEAN" == "true" ]] || confirm_action "Homebrew를 정리하시겠습니까?" "y"; then
+                if ! clean_homebrew "$1"; then
+                    log_message "⚠️ Warning: Some Homebrew cleanup operations failed, but continuing..."
+                fi
+                brew_cache_size_after=$(du -sh "$brew_cache_dir" 2>/dev/null | awk '{print $1}')
+                log_message "Homebrew cache size after cleaning: $brew_cache_size_after"
+            else
+                log_message "Skipping Homebrew cleanup"
             fi
-            
-            # Get cache size after cleaning
-            brew_cache_size_after=$(du -sh "$brew_cache_dir" 2>/dev/null | awk '{print $1}')
-            log_message "Homebrew cache size after cleaning: $brew_cache_size_after"
         fi
     else
         log_message "Homebrew is not installed on this system"
@@ -575,10 +590,6 @@ else
                     log_message "Checking for outdated and unused global npm packages..."
                     
                     # Get list of global packages
-                    log_message "Getting list of global npm packages..."
-                    global_packages=$(npm list -g --depth=0 2>/dev/null)
-                    
-                    # Check for outdated packages
                     log_message "Checking for outdated global packages..."
                     npm_outdated=$(npm outdated -g 2>/dev/null)
                     if [ -n "$npm_outdated" ]; then
@@ -625,10 +636,11 @@ if command -v yarn &>/dev/null; then
             yarn_cache_size_after=$(du -sh "$yarn_cache_dir" 2>/dev/null | awk '{print $1}')
             log_message "Yarn cache size after cleaning: $yarn_cache_size_after"
         else
-            read -p "Would you like to clean the Yarn cache? (y/n): " yarn_clean
-            if [[ "$yarn_clean" == "y" || "$yarn_clean" == "Y" ]]; then
+            if confirm_action "Would you like to clean the Yarn cache?" "n"; then
                 log_message "Cleaning Yarn cache..."
                 yarn cache clean 2>&1 | tee -a "$LOG_FILE" || handle_error "Failed to clean Yarn cache"
+                yarn_cache_size_after=$(du -sh "$yarn_cache_dir" 2>/dev/null | awk '{print $1}')
+                log_message "Yarn cache size after cleaning: $yarn_cache_size_after"
             else
                 log_message "Skipping Yarn cache cleanup"
             fi
@@ -647,9 +659,9 @@ log_message "Checking for large node_modules directories..."
 if [ "$DRY_RUN" = true ]; then
     log_message "DRY RUN: Would scan for large node_modules directories"
 else
-    # Find top 10 largest node_modules directories - 한정된 시간 내 실행되도록 timeout 적용
-    log_message "Searching for large node_modules directories (timeout: 60s)..."
-    large_dirs=$(timeout 60s find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
+    # Find top 10 largest node_modules directories
+    log_message "Searching for large node_modules directories..."
+    large_dirs=$(find "$HOME" -type d -name "node_modules" -not -path "*/\.*" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
     
     if [ -n "$large_dirs" ]; then
         log_message "Found the following large node_modules directories:"
@@ -658,8 +670,8 @@ else
         if [[ "$1" == "--auto-clean" ]]; then
             log_message "Checking for unused node_modules (projects not modified in last 90 days)..."
             
-            # 검색 범위를 일반적인 프로젝트 디렉토리로 제한하고 타임아웃 설정
-            log_message "Searching in common project directories only (timeout: 30s)..."
+            # 검색 범위를 일반적인 프로젝트 디렉토리로 제한
+            log_message "Searching in common project directories only..."
             
             # 특정 디렉토리만 검색 (일반적인 프로젝트 위치)
             project_dirs=("$HOME/Documents" "$HOME/Projects" "$HOME/Development" "$HOME/Dev")
@@ -668,7 +680,7 @@ else
             for dir in "${project_dirs[@]}"; do
                 if [ -d "$dir" ]; then
                     log_message "Scanning $dir for unused node_modules..."
-                    result=$(timeout 30s find "$dir" -type d -name "node_modules" -not -path "*/\.*" -mtime +90 -exec dirname {} \; 2>/dev/null || echo "")
+                    result=$(find "$dir" -type d -name "node_modules" -not -path "*/\.*" -mtime +90 -exec dirname {} \; 2>/dev/null || echo "")
                     if [ -n "$result" ]; then
                         old_projects="${old_projects}${result}\n"
                     fi
@@ -680,11 +692,11 @@ else
                 echo -e "$old_projects" | tee -a "$LOG_FILE"
                 log_message "You may want to consider removing these manually."
             else
-                log_message "No potentially unused node_modules directories found or search timed out."
+                log_message "No potentially unused node_modules directories found."
             fi
         fi
     else
-        log_message "No large node_modules directories found or search timed out."
+        log_message "No large node_modules directories found."
     fi
 fi
 
@@ -707,42 +719,29 @@ else
         elif [[ "$1" == "--auto-clean" ]]; then
             log_message "Auto-cleaning Docker resources (--auto-clean flag detected)..."
             
-            # 안전하게 실행 (각 명령마다 오류 처리 및 타임아웃 추가)
+            # 안전하게 실행 (각 명령마다 오류 처리)
             log_message "Pruning Docker system (images, containers, networks)..."
-            if timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE"; then
+            if docker system prune -f 2>&1 | tee -a "$LOG_FILE"; then
                 log_message "Successfully pruned Docker system"
             else
-                log_message "WARNING: Failed or timed out while pruning Docker system. Continuing..."
+                log_message "WARNING: Docker system prune failed. Continuing..."
             fi
-            
+
             log_message "Pruning Docker volumes..."
-            if timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE"; then
+            if docker volume prune -f 2>&1 | tee -a "$LOG_FILE"; then
                 log_message "Successfully pruned Docker volumes"
             else
-                log_message "WARNING: Failed or timed out while pruning Docker volumes. Continuing..."
+                log_message "WARNING: Docker volume prune failed. Continuing..."
             fi
             
             log_message "Docker cleanup completed"
         else
-            docker_clean=""
-            if ! read -p "Would you like to clean unused Docker resources? (y/n): " docker_clean; then
-                log_message "WARNING: Input error encountered for Docker cleanup prompt. Skipping..."
-                docker_clean="n"
-            fi
-            
-            if [[ "$docker_clean" == "y" || "$docker_clean" == "Y" ]]; then
+            if confirm_action "Clean unused Docker resources?" "n"; then
                 log_message "Cleaning Docker resources..."
-                timeout 60s docker system prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker system prune failed or timed out"
-                
-                docker_vol_clean=""
-                if ! read -p "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container (y/n): " docker_vol_clean; then
-                    log_message "WARNING: Input error encountered for Docker volumes cleanup prompt. Skipping..."
-                    docker_vol_clean="n"
-                fi
-                
-                if [[ "$docker_vol_clean" == "y" || "$docker_vol_clean" == "Y" ]]; then
+                docker system prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker system prune failed"
+                if confirm_action "Also clean unused Docker volumes? This will delete ALL volumes not used by at least one container" "n"; then
                     log_message "Cleaning Docker volumes..."
-                    timeout 30s docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker volume prune failed or timed out"
+                    docker volume prune -f 2>&1 | tee -a "$LOG_FILE" || log_message "WARNING: Docker volume prune failed"
                 else
                     log_message "Skipping Docker volumes cleanup"
                 fi
@@ -765,7 +764,7 @@ if [ "$SKIP_DOCKER" = true ]; then
 else
     # Docker 먼저 확인
     docker_running=false
-    if timeout 5s docker info &>/dev/null; then
+    if docker info &>/dev/null; then
         docker_running=true
     else
         log_message "WARNING: Docker daemon is not running. Skipping OpenWebUI checks."
@@ -773,13 +772,13 @@ else
     
     if [ "$docker_running" = true ]; then
         # Check if OpenWebUI is installed/running
-        if timeout 10s docker ps | grep -q "open-webui"; then
+        if docker ps | grep -q "open-webui"; then
             log_message "OpenWebUI detected. Checking data volume..."
             
-            # Get data volume size before cleaning - 안전하게 타임아웃 설정
-            openwebui_volume_size_before=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}' || echo "unknown")
+            # Get data volume size before cleaning safely
+            openwebui_volume_size_before=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}' || echo "unknown")
             # Get numeric size in bytes for comparison
-            openwebui_bytes_before=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null || echo "0")
+            openwebui_bytes_before=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null || echo "0")
             log_message "OpenWebUI data volume size before cleaning: $openwebui_volume_size_before"
             
             if [ "$DRY_RUN" = true ]; then
@@ -792,7 +791,7 @@ else
                 
                 # Clean cache files and temporary data - 안전한 명령어 실행
                 log_message "Removing cache and temporary files..."
-                if timeout 30s docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                if docker run --rm -v open-webui_open-webui:/data alpine sh -c "
                     # Remove cache directory
                     find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || true
                     
@@ -809,12 +808,12 @@ else
                 " 2>&1 | tee -a "$LOG_FILE"; then
                     log_message "Successfully cleaned OpenWebUI files"
                 else
-                    log_message "WARNING: OpenWebUI cleanup may have timed out or failed. Continuing..."
+                    log_message "WARNING: OpenWebUI cleanup may have failed. Continuing..."
                 fi
                 
                 # Restart OpenWebUI to apply changes
                 log_message "Restarting OpenWebUI container to apply changes..."
-                if timeout 20s docker restart open-webui 2>&1 | tee -a "$LOG_FILE"; then
+                if docker restart open-webui 2>&1 | tee -a "$LOG_FILE"; then
                     log_message "Successfully restarted OpenWebUI container"
                 else
                     log_message "WARNING: Failed to restart OpenWebUI container. It may be in an inconsistent state."
@@ -823,34 +822,20 @@ else
                 # 이 부분은 입력을 받으므로 복잡합니다 - 단순화하여 안전하게 실행
                 log_message "OpenWebUI cleanup requires interactive input."
                 
-                cache_clean=""
-                if ! read -p "Clean cache files? (y/n): " cache_clean; then
-                    log_message "WARNING: Input error encountered for OpenWebUI cache cleanup prompt. Skipping..."
-                    cache_clean="n"
-                fi
-                
-                # 단순화된 정리 작업: 기본 캐시 파일만 정리
-                if [[ "$cache_clean" == "y" || "$cache_clean" == "Y" ]]; then
+                if confirm_action "Clean cache files?" "n"; then
                     log_message "Cleaning OpenWebUI cache files..."
-                    if timeout 30s docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                    if docker run --rm -v open-webui_open-webui:/data alpine sh -c "
                         find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found or already cleaned'
                         find /data -name '*.temp' -o -name '*.tmp' -o -name '*.downloading' -o -name '*.part' -delete 2>/dev/null || echo 'No temporary files found or already cleaned'
                         echo 'OpenWebUI cache cleanup completed'
                     " 2>&1 | tee -a "$LOG_FILE"; then
                         log_message "OpenWebUI cache cleanup completed successfully"
                     else
-                        log_message "WARNING: OpenWebUI cache cleanup timed out or failed"
+                        log_message "WARNING: OpenWebUI cache cleanup failed"
                     fi
-                    
-                    restart_openwebui=""
-                    if ! read -p "Would you like to restart the OpenWebUI container to apply changes? (y/n): " restart_openwebui; then
-                        log_message "WARNING: Input error encountered for OpenWebUI restart prompt. Skipping..."
-                        restart_openwebui="n"
-                    fi
-                    
-                    if [[ "$restart_openwebui" == "y" || "$restart_openwebui" == "Y" ]]; then
+                    if confirm_action "Would you like to restart the OpenWebUI container to apply changes?" "n"; then
                         log_message "Restarting OpenWebUI container..."
-                        if timeout 20s docker restart open-webui 2>&1 | tee -a "$LOG_FILE"; then
+                        if docker restart open-webui 2>&1 | tee -a "$LOG_FILE"; then
                             log_message "Successfully restarted OpenWebUI container"
                         else
                             log_message "WARNING: Failed to restart OpenWebUI container"
@@ -864,18 +849,18 @@ else
             fi
             
             # Get data volume size after cleaning - 안전한 체크
-            openwebui_volume_size_after=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}' || echo "unknown")
+            openwebui_volume_size_after=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -sh /vol" 2>/dev/null | awk '{print $1}' || echo "unknown")
             # Get numeric size in bytes for comparison
-            openwebui_bytes_after=$(timeout 10s docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null || echo "0")
+            openwebui_bytes_after=$(docker run --rm -v open-webui_open-webui:/vol alpine sh -c "du -b /vol | cut -f1" 2>/dev/null || echo "0")
             log_message "OpenWebUI data volume size after cleaning: $openwebui_volume_size_after"
             
             # Calculate and display space saved - 에러 처리
-            if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]] && [ $openwebui_bytes_before -gt 0 ] && [ $openwebui_bytes_after -gt 0 ]; then
+            if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]] && [ "$openwebui_bytes_before" -gt 0 ] && [ "$openwebui_bytes_after" -gt 0 ]; then
                 bytes_saved=$((openwebui_bytes_before - openwebui_bytes_after))
-                if [ $bytes_saved -gt 0 ]; then
-                    log_message "Space saved: $(format_disk_space $bytes_saved)"
-                elif [ $bytes_saved -lt 0 ]; then
-                    log_message "Volume size increased by: $(format_disk_space $((bytes_saved * -1)))"
+                if [ "$bytes_saved" -gt 0 ]; then
+                    log_message "Space saved: $(format_disk_space "$bytes_saved")"
+                elif [ "$bytes_saved" -lt 0 ]; then
+                    log_message "Volume size increased by: $(format_disk_space "$((bytes_saved * -1))")"
                 else
                     log_message "No change in volume size"
                 fi
@@ -886,7 +871,7 @@ else
             log_message "OpenWebUI not detected on this system (containers not running)"
             
             # Check if volume exists even if container is not running
-            if timeout 5s docker volume ls | grep -q "open-webui_open-webui"; then
+            if docker volume ls | grep -q "open-webui_open-webui"; then
                 log_message "OpenWebUI data volume found but container not running"
                 
                 check_volume=""
@@ -894,15 +879,16 @@ else
                     check_volume="y"
                     log_message "Auto-cleaning OpenWebUI volume..."
                 else
-                    if ! read -p "Would you like to check OpenWebUI data volume for cleanup? (y/n): " check_volume; then
-                        log_message "WARNING: Input error encountered for OpenWebUI volume cleanup prompt. Skipping..."
+                    if confirm_action "Would you like to check OpenWebUI data volume for cleanup?" "n"; then
+                        check_volume="y"
+                    else
                         check_volume="n"
                     fi
                 fi
                 
                 if [[ "$check_volume" == "y" || "$check_volume" == "Y" ]]; then
                     log_message "Cleaning OpenWebUI data volume even though container is not running..."
-                    if timeout 30s docker run --rm -v open-webui_open-webui:/data alpine sh -c "
+                    if docker run --rm -v open-webui_open-webui:/data alpine sh -c "
                         # Remove cache directory
                         find /data -name '*cache*' -type d -exec rm -rf {} \; 2>/dev/null || echo 'No cache directories found'
                         
@@ -915,7 +901,7 @@ else
                     " 2>&1 | tee -a "$LOG_FILE"; then
                         log_message "OpenWebUI volume cleanup completed successfully"
                     else
-                        log_message "WARNING: OpenWebUI volume cleanup timed out or failed"
+                        log_message "WARNING: OpenWebUI volume cleanup failed"
                     fi
                 else
                     log_message "Skipping OpenWebUI volume cleanup"
@@ -972,8 +958,7 @@ else
                     log_message "No old versions to clean"
                 fi
             else
-                read -p "Clean old Android Studio versions (keep latest only)? (y/n): " clean_old_versions
-                if [[ "$clean_old_versions" == "y" || "$clean_old_versions" == "Y" ]]; then
+                if confirm_action "Clean old Android Studio versions (keep latest only)?" "n"; then
                     latest_version=$(echo "$android_studio_dirs" | sort | tail -n 1)
                     old_versions=$(echo "$android_studio_dirs" | grep -v "$latest_version")
                     if [ -n "$old_versions" ]; then
@@ -1139,13 +1124,7 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
                 fi
             else
                 # 사용자 입력을 받는 인터랙티브 모드에서 예외 처리 추가
-                xcode_clean=""
-                if ! read -p "Clean XCode DerivedData? (y/n): " xcode_clean; then
-                    log_message "WARNING: Input error encountered for XCode DerivedData cleanup prompt. Skipping..."
-                    xcode_clean="n"  # 입력 오류 시 기본값을 n으로 설정
-                fi
-                
-                if [[ "$xcode_clean" == "y" || "$xcode_clean" == "Y" ]]; then
+                if confirm_action "Clean XCode DerivedData?" "n"; then
                     log_message "Cleaning XCode DerivedData..."
                     if rm -rf "$HOME/Library/Developer/Xcode/DerivedData"/* 2>/dev/null; then
                         log_message "Successfully cleaned XCode DerivedData"
@@ -1181,14 +1160,7 @@ if [ -d "$HOME/Library/Developer/Xcode" ]; then
                     handle_error "Failed to clean old XCode Archives"
                 fi
             else
-                # 사용자 입력을 받는 인터랙티브 모드에서 예외 처리 추가
-                archives_clean=""
-                if ! read -p "Clean old XCode Archives (older than 90 days)? (y/n): " archives_clean; then
-                    log_message "WARNING: Input error encountered for XCode Archives cleanup prompt. Skipping..."
-                    archives_clean="n"  # 입력 오류 시 기본값을 n으로 설정
-                fi
-                
-                if [[ "$archives_clean" == "y" || "$archives_clean" == "Y" ]]; then
+                if confirm_action "Clean old XCode Archives (older than 90 days)?" "n"; then
                     log_message "Cleaning XCode Archives older than 90 days..."
                     if find "$HOME/Library/Developer/Xcode/Archives" -type d -mtime +90 -exec rm -rf {} \; 2>/dev/null; then
                         log_message "Successfully cleaned old XCode Archives"
@@ -1241,21 +1213,15 @@ else
         
         if [[ "$1" == "--auto-clean" ]]; then
             log_message "Auto-cleaning .DS_Store files..."
-            if timeout 60s find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
+            if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
                 log_message "Successfully removed .DS_Store files"
             else
-                log_message "WARNING: Some .DS_Store files could not be removed or timed out. Continuing..."
+                log_message "WARNING: Some .DS_Store files could not be removed. Continuing..."
             fi
         else
-            ds_clean=""
-            if ! read -p "Would you like to remove all .DS_Store files? (y/n): " ds_clean; then
-                log_message "WARNING: Input error encountered for .DS_Store cleanup prompt. Skipping..."
-                ds_clean="n"
-            fi
-            
-            if [[ "$ds_clean" == "y" || "$ds_clean" == "Y" ]]; then
+            if confirm_action "Would you like to remove all .DS_Store files?" "n"; then
                 log_message "Removing .DS_Store files..."
-                if timeout 60s find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
+                if find "$HOME" -name ".DS_Store" -type f -delete 2>/dev/null; then
                     log_message "Successfully removed .DS_Store files"
                 else
                     log_message "WARNING: Some .DS_Store files could not be removed. Continuing..."
@@ -1285,15 +1251,9 @@ elif [ "$AUTO_CLEAN" = true ]; then
         log_message "No significant localization directories found."
     fi
 else
-    lang_check=""
-    if ! read -p "Would you like to check for unused language resources? (y/n): " lang_check; then
-        log_message "WARNING: Input error encountered for language resources prompt. Skipping..."
-        lang_check="n"
-    fi
-    
-    if [[ "$lang_check" == "y" || "$lang_check" == "Y" ]]; then
+    if confirm_action "Would you like to check for unused language resources?" "n"; then
         log_message "Checking for large language resource directories..."
-        
+
         # Find top 10 largest localization directories
         large_locales=$(find /Applications -path "*.lproj" -type d -not -path "*/en.lproj" -not -path "*/Base.lproj" -exec du -sh {} \; 2>/dev/null | sort -hr | head -10)
         
@@ -1315,6 +1275,7 @@ log_message "----------------------------------------"
 log_message "SECTION 7: Final Summary"
 
 # 스크립트 종료 시 실행될 cleanup 함수 정의
+# shellcheck disable=SC2317
 cleanup() {
     # 종료 직전에 항상 최종 요약 보여주기
     if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
@@ -1362,7 +1323,7 @@ log_message "Final disk free space: $(format_disk_space $((FINAL_FREE_SPACE * 10
 
 # 안전하게 공간 절약 결과 계산
 if [ $SPACE_SAVED -gt 0 ]; then
-    log_message "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+    log_message "Total space saved: $(calculate_space_saved "$INITIAL_FREE_SPACE" "$FINAL_FREE_SPACE")"
 elif [ $SPACE_SAVED -lt 0 ]; then
     log_message "WARNING: Disk space appears to have decreased by: $(format_disk_space $((-SPACE_SAVED * 1024)) 2>/dev/null)"
     log_message "This might be due to system activities during cleanup or measurement errors"
@@ -1381,7 +1342,7 @@ echo "=================================================="
 echo "             Cleanup process completed!            "
 echo "=================================================="
 if [ $SPACE_SAVED -gt 0 ]; then
-    echo "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+    echo "Total space saved: $(calculate_space_saved "$INITIAL_FREE_SPACE" "$FINAL_FREE_SPACE")"
 else
     echo "No significant disk space was saved"
 fi
