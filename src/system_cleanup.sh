@@ -307,8 +307,17 @@ else
             log_message "Found the following local snapshots:"
             echo "$local_snapshots" | tee -a "$LOG_FILE"
             
+<<<<<<< HEAD
+            # 스냅샷 개수 계산
+            snapshot_count=$(echo "$local_snapshots" | wc -l)
+            log_info "총 ${snapshot_count}개의 로컬 스냅샷이 있습니다"
+            
+            if [[ "$AUTO_CLEAN" == true ]]; then
+                log_info "자동 정리 모드: 로컬 스냅샷 정리 중..."
+=======
             if [ "$AUTO_CLEAN" = true ]; then
                 log_message "Auto-cleaning local snapshots..."
+>>>>>>> origin/main
                 if ! clean_time_machine_snapshots; then
                     log_message "⚠️ Warning: Failed to clean Time Machine snapshots, but continuing..."
                 fi
@@ -452,10 +461,6 @@ else
                     log_message "Checking for outdated and unused global npm packages..."
                     
                     # Get list of global packages
-                    log_message "Getting list of global npm packages..."
-                    global_packages=$(npm list -g --depth=0 2>/dev/null)
-                    
-                    # Check for outdated packages
                     log_message "Checking for outdated global packages..."
                     npm_outdated=$(npm outdated -g 2>/dev/null)
                     if [ -n "$npm_outdated" ]; then
@@ -747,12 +752,12 @@ else
             log_message "OpenWebUI data volume size after cleaning: $openwebui_volume_size_after"
             
             # Calculate and display space saved - 에러 처리
-            if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]] && [ $openwebui_bytes_before -gt 0 ] && [ $openwebui_bytes_after -gt 0 ]; then
+            if [[ $openwebui_bytes_before =~ ^[0-9]+$ ]] && [[ $openwebui_bytes_after =~ ^[0-9]+$ ]] && [ "$openwebui_bytes_before" -gt 0 ] && [ "$openwebui_bytes_after" -gt 0 ]; then
                 bytes_saved=$((openwebui_bytes_before - openwebui_bytes_after))
-                if [ $bytes_saved -gt 0 ]; then
-                    log_message "Space saved: $(format_disk_space $bytes_saved)"
-                elif [ $bytes_saved -lt 0 ]; then
-                    log_message "Volume size increased by: $(format_disk_space $((bytes_saved * -1)))"
+                if [ "$bytes_saved" -gt 0 ]; then
+                    log_message "Space saved: $(format_disk_space "$bytes_saved")"
+                elif [ "$bytes_saved" -lt 0 ]; then
+                    log_message "Volume size increased by: $(format_disk_space "$((bytes_saved * -1))")"
                 else
                     log_message "No change in volume size"
                 fi
@@ -1192,6 +1197,7 @@ log_message "----------------------------------------"
 log_message "SECTION 7: Final Summary"
 
 # 스크립트 종료 시 실행될 cleanup 함수 정의
+# shellcheck disable=SC2317
 cleanup() {
     # 종료 직전에 항상 최종 요약 보여주기
     if [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ]; then
@@ -1239,7 +1245,7 @@ log_message "Final disk free space: $(format_disk_space $((FINAL_FREE_SPACE * 10
 
 # 안전하게 공간 절약 결과 계산
 if [ $SPACE_SAVED -gt 0 ]; then
-    log_message "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+    log_message "Total space saved: $(calculate_space_saved "$INITIAL_FREE_SPACE" "$FINAL_FREE_SPACE")"
 elif [ $SPACE_SAVED -lt 0 ]; then
     log_message "WARNING: Disk space appears to have decreased by: $(format_disk_space $((-SPACE_SAVED * 1024)) 2>/dev/null)"
     log_message "This might be due to system activities during cleanup or measurement errors"
@@ -1258,7 +1264,7 @@ echo "=================================================="
 echo "             Cleanup process completed!            "
 echo "=================================================="
 if [ $SPACE_SAVED -gt 0 ]; then
-    echo "Total space saved: $(calculate_space_saved $INITIAL_FREE_SPACE $FINAL_FREE_SPACE)"
+    echo "Total space saved: $(calculate_space_saved "$INITIAL_FREE_SPACE" "$FINAL_FREE_SPACE")"
 else
     echo "No significant disk space was saved"
 fi
