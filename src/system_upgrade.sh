@@ -12,13 +12,11 @@ INSTALLED_APPS="$TEMP_DIR/apps_installed.txt"
 AVAILABLE_CASKS="$TEMP_DIR/casks_available.txt"
 LOG_FILE="$LOG_DIR/upgrade_$(date +"%Y%m%d_%H%M%S").log"
 
-<<<<<<< HEAD
-# 종료 시 임시 파일 정리 설정
-trap 'cleanup_temp_files "$TEMP_DIR"' EXIT
-=======
 # 로그 디렉토리 생성
 mkdir -p "$LOG_DIR"
->>>>>>> origin/main
+
+# 종료 시 임시 파일 정리 설정
+trap 'cleanup' EXIT
 
 # 로깅 함수
 log_message() {
@@ -122,7 +120,7 @@ cleanup() {
 }
 
 # 종료 시 정리 함수 등록 (스크립트 종료 시에만 실행)
-trap cleanup EXIT
+# trap cleanup EXIT  # 이미 위에서 설정됨
 
 # 임시 디렉토리 생성 및 권한 설정
 log_message "임시 디렉토리 설정 중..."
@@ -200,31 +198,9 @@ update_casks() {
     fi
 }
 
-# homebrew-cask-upgrade 플러그인 확인 및 설치
-if ! command -v brew-cu &> /dev/null && ! brew cu --help &> /dev/null; then
-    log_message "homebrew-cask-upgrade 플러그인이 설치되지 않았습니다. 설치를 시도합니다..."
-    
-    # 플러그인 설치 시도
-    if brew tap buo/cask-upgrade; then
-        log_message "✅ homebrew-cask-upgrade 플러그인 설치 완료"
-    else
-        log_message "⚠️ homebrew-cask-upgrade 플러그인 설치 실패, 대안 방법 사용"
-        update_casks
-    fi
-fi
-
-# homebrew-cask-upgrade가 사용 가능한 경우 사용 (오류 발생 시 대안 방법으로 fallback)
-if command -v brew-cu &> /dev/null || brew cu --help &> /dev/null; then
-    log_message "homebrew-cask-upgrade를 사용하여 Cask 업데이트를 진행합니다..."
-    
-    # brew cu 실행 시도 (오류 발생 시 대안 방법 사용)
-    if brew cu -a 2>/dev/null; then
-        log_message "✅ homebrew-cask-upgrade를 통한 Cask 업데이트 완료"
-    else
-        log_message "⚠️ homebrew-cask-upgrade 실행 실패, 대안 방법으로 전환"
-        update_casks
-    fi
-fi
+# 안정적인 Cask 업데이트 실행
+log_message "안정적인 개별 Cask 업데이트를 진행합니다..."
+update_casks
 
 # =========================================
 # 시스템 전체 업데이트 (topgrade)
@@ -237,13 +213,8 @@ if ! command -v topgrade &> /dev/null; then
     fi
 fi
 
-# topgrade 실행 전에 brew cu 문제 해결
-log_message "topgrade 실행 전에 brew cu 호환성 문제를 해결합니다..."
-
-# homebrew-cask-upgrade 플러그인 제거 (호환성 문제로 인해)
-if brew untap buo/cask-upgrade 2>/dev/null; then
-    log_message "✅ 호환성 문제가 있는 homebrew-cask-upgrade 플러그인 제거 완료"
-fi
+# topgrade 실행 준비 완료
+log_message "topgrade 실행을 준비합니다..."
 
 # topgrade 실행 (안드로이드 스튜디오 비활성화)
 if ! topgrade --disable android_studio --yes; then
@@ -254,83 +225,53 @@ fi
 # 안드로이드 스튜디오 별도 관리
 # =========================================
 log_message "안드로이드 스튜디오 업데이트를 확인합니다..."
-if command -v studio &> /dev/null; then
-    current_version=$(brew info --cask android-studio | grep "Installed" | awk '{print $2}' | tr -d '()')
-    log_message "현재 안드로이드 스튜디오 버전: $current_version"
+
+if command -v studio &> /dev/null || command -v android-studio &> /dev/null || [[ -d "/Applications/Android Studio.app" ]]; then
+    # 현재 버전 확인 (개선된 방법)
+    if command -v brew &> /dev/null; then
+        # brew info 출력에서 버전 정보 추출 (여러 방법 시도)
+        current_version=""
+        
+        # 방법 1: 첫 번째 줄에서 버전 추출 (예: android-studio: 2025.1.2.11)
+        current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
+        
+        # 방법 2: Caskroom 경로에서 버전 추출 (fallback)
+        if [[ -z "$current_version" ]]; then
+            current_version=$(brew info --cask android-studio 2>/dev/null | grep "Caskroom" | grep -o '[0-9][0-9.]*[0-9]' | head -1)
+        fi
+        
+        # 방법 3: 일반적인 버전 패턴 검색 (fallback)
+        if [[ -z "$current_version" ]]; then
+            current_version=$(brew info --cask android-studio 2>/dev/null | grep -o '[0-9]\{4\}\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+        fi
+        
+        if [[ -n "$current_version" ]]; then
+            log_message "현재 안드로이드 스튜디오 버전: $current_version"
+        else
+            log_message "안드로이드 스튜디오가 설치되어 있지만 버전 정보를 가져올 수 없습니다"
+        fi
+    fi
     
-    # 안드로이드 스튜디오 업데이트 확인 (선택적)
+    # 안드로이드 스튜디오 업데이트 확인
     log_message "안드로이드 스튜디오를 업데이트하시겠습니까? (y/n)"
     read -r update_android_studio
     if [[ "$update_android_studio" =~ ^[Yy]$ ]]; then
         log_message "안드로이드 스튜디오 업데이트를 시작합니다..."
-        if ! brew upgrade --cask android-studio; then
-            log_message "⚠️ 안드로이드 스튜디오 업데이트 실패 (정상적인 상황일 수 있음)"
+        
+        if command -v brew &> /dev/null; then
+            if brew upgrade --cask android-studio 2>/dev/null; then
+                log_message "✅ 안드로이드 스튜디오 업데이트 완료"
+            else
+                log_message "⚠️ 안드로이드 스튜디오 업데이트 실패 (이미 최신 버전이거나 정상적인 상황일 수 있음)"
+            fi
         else
-            log_message "✅ 안드로이드 스튜디오 업데이트 완료"
+            log_message "⚠️ Homebrew가 없어 안드로이드 스튜디오를 업데이트할 수 없습니다"
         fi
     else
         log_message "안드로이드 스튜디오 업데이트를 건너뜁니다."
     fi
 else
-<<<<<<< HEAD
-    log_info "안드로이드 스튜디오 업데이트를 확인합니다..."
-
-    if command_exists studio || command_exists android-studio || [[ -d "/Applications/Android Studio.app" ]]; then
-        # 현재 버전 확인 (개선된 방법)
-        if command_exists brew; then
-            # brew info 출력에서 버전 정보 추출 (여러 방법 시도)
-            current_version=""
-            
-            # 방법 1: 첫 번째 줄에서 버전 추출 (예: android-studio: 2025.1.2.11)
-            current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
-            
-            # 방법 2: Caskroom 경로에서 버전 추출 (fallback)
-            if [[ -z "$current_version" ]]; then
-                current_version=$(brew info --cask android-studio 2>/dev/null | grep "Caskroom" | grep -o '[0-9][0-9.]*[0-9]' | head -1)
-            fi
-            
-            # 방법 3: 일반적인 버전 패턴 검색 (fallback)
-            if [[ -z "$current_version" ]]; then
-                current_version=$(brew info --cask android-studio 2>/dev/null | grep -o '[0-9]\{4\}\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-            fi
-            
-            if [[ -n "$current_version" ]]; then
-                log_info "현재 안드로이드 스튜디오 버전: $current_version"
-            else
-                log_info "안드로이드 스튜디오가 설치되어 있지만 버전 정보를 가져올 수 없습니다"
-            fi
-        fi
-        
-        # 안드로이드 스튜디오 업데이트 확인 (AUTO_YES 모드 지원)
-        should_update=false
-        if [[ "$AUTO_YES" == "true" ]]; then
-            should_update=true
-            log_info "자동 확인 모드: 안드로이드 스튜디오 업데이트 진행"
-        elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "y" 30; then
-            should_update=true
-        fi
-
-        if [[ "$should_update" == "true" ]]; then
-            log_info "안드로이드 스튜디오 업데이트를 시작합니다..."
-            
-            if command_exists brew; then
-                if brew upgrade --cask android-studio 2>/dev/null; then
-                    log_success "안드로이드 스튜디오 업데이트 완료"
-                else
-                    log_warning "안드로이드 스튜디오 업데이트 실패 (이미 최신 버전이거나 정상적인 상황일 수 있음)"
-                fi
-            else
-                log_warning "Homebrew가 없어 안드로이드 스튜디오를 업데이트할 수 없습니다"
-            fi
-        else
-            log_info "안드로이드 스튜디오 업데이트를 건너뜁니다."
-        fi
-    else
-        log_info "안드로이드 스튜디오가 설치되어 있지 않습니다."
-    fi
-=======
     log_message "안드로이드 스튜디오가 설치되어 있지 않습니다."
->>>>>>> origin/main
 fi
 
 # =========================================
@@ -408,71 +349,9 @@ if [ ${#found_apps[@]} -gt 0 ]; then
     if [[ "$response" =~ ^[Yy]$ ]]; then
         log_message "설치를 시작합니다..."
         for app in "${found_apps[@]}"; do
-<<<<<<< HEAD
-            echo "  - $app"
-        done
-        echo ""
-        
-        should_install=false
-        if [[ "$AUTO_YES" == "true" ]]; then
-            should_install=true
-            log_info "자동 확인 모드: 발견된 앱들을 설치합니다"
-        elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "y" 30; then
-            should_install=true
-        fi
-
-        if [[ "$should_install" == "true" ]]; then
-            log_info "설치를 시작합니다..."
-            installed_count=0
-            total_count=${#found_apps[@]}
-            
-            for app in "${found_apps[@]}"; do
-                ((installed_count++))
-                show_progress "$installed_count" "$total_count" "$app 설치 중"
-                
-                if brew install --cask --force "$app" >/dev/null 2>&1; then
-                    log_success "$app 설치 완료"
-                else
-                    log_warning "$app 설치 실패"
-                fi
-            done
-            
-            log_success "앱 설치 과정이 완료되었습니다."
-        else
-            log_info "설치가 취소되었습니다."
-        fi
-    else
-        log_info "Homebrew Cask로 설치 가능한 새로운 앱이 없습니다."
-    fi
-else
-    log_warning "Homebrew가 설치되어 있지 않아 앱 검색을 건너뜁니다."
-fi
-
-# 최종 요약 및 권장사항
-print_section_header "시스템 상태 점검 및 권장사항" "5"
-
-# Ruby 버전 확인 및 권장사항
-print_subsection_header "Ruby 환경 점검" "5.1"
-if command_exists ruby; then
-    RUBY_VERSION=$(ruby -v 2>/dev/null | awk '{print $2}' || echo "unknown")
-    if [[ "$RUBY_VERSION" != "unknown" ]]; then
-        log_info "현재 Ruby 버전: $RUBY_VERSION"
-        
-        # 버전 비교 (3.2.0과 비교)
-        if command_exists printf && command_exists sort; then
-            min_version="3.2.0"
-            if [[ "$(printf '%s\n' "$min_version" "$RUBY_VERSION" | sort -V | head -n1)" != "$min_version" ]]; then
-                log_warning "현재 Ruby 버전 ($RUBY_VERSION)이 일부 gem 요구사항(3.2.0+)을 충족하지 않을 수 있습니다."
-                log_info "권장 조치:"
-                log_info "  1. Ruby 업그레이드: brew upgrade ruby"
-                log_info "  2. 또는 호환 gem 설치: gem install erb -v 4.0.0 && gem install typeprof -v 0.20.0"
-            else
-                log_success "Ruby 버전이 요구사항을 충족합니다"
-=======
             log_message "Installing $app..."
             if ! brew install --cask --force "$app"; then
                 log_message "경고: $app 설치 실패"
->>>>>>> origin/main
             fi
         done
         log_message "설치가 완료되었습니다."
