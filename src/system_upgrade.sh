@@ -166,8 +166,59 @@ fi
 # Homebrew Cask 업데이트
 # =========================================
 log_message "Homebrew Cask 업데이트를 시작합니다..."
-if ! brew cu -a; then
-    handle_error "Homebrew Cask 업데이트 실패"
+
+# Cask 업데이트 함수 정의
+update_casks() {
+    local updated_count=0
+    local failed_count=0
+    
+    # 설치된 cask 목록 가져오기
+    local installed_casks=$(brew list --cask 2>/dev/null || echo "")
+    
+    if [ -n "$installed_casks" ]; then
+        while IFS= read -r cask; do
+            if [ -n "$cask" ]; then
+                log_message "Cask '$cask' 업데이트 중..."
+                if brew upgrade --cask "$cask" 2>/dev/null; then
+                    ((updated_count++))
+                    log_message "✅ $cask 업데이트 완료"
+                else
+                    ((failed_count++))
+                    log_message "⚠️ $cask 업데이트 실패 (정상적인 상황일 수 있음)"
+                fi
+            fi
+        done <<< "$installed_casks"
+        
+        log_message "Cask 업데이트 결과: $updated_count개 성공, $failed_count개 실패"
+    else
+        log_message "업데이트할 Cask가 없습니다."
+    fi
+}
+
+# homebrew-cask-upgrade 플러그인 확인 및 설치
+if ! command -v brew-cu &> /dev/null && ! brew cu --help &> /dev/null; then
+    log_message "homebrew-cask-upgrade 플러그인이 설치되지 않았습니다. 설치를 시도합니다..."
+    
+    # 플러그인 설치 시도
+    if brew tap buo/cask-upgrade; then
+        log_message "✅ homebrew-cask-upgrade 플러그인 설치 완료"
+    else
+        log_message "⚠️ homebrew-cask-upgrade 플러그인 설치 실패, 대안 방법 사용"
+        update_casks
+    fi
+fi
+
+# homebrew-cask-upgrade가 사용 가능한 경우 사용 (오류 발생 시 대안 방법으로 fallback)
+if command -v brew-cu &> /dev/null || brew cu --help &> /dev/null; then
+    log_message "homebrew-cask-upgrade를 사용하여 Cask 업데이트를 진행합니다..."
+    
+    # brew cu 실행 시도 (오류 발생 시 대안 방법 사용)
+    if brew cu -a 2>/dev/null; then
+        log_message "✅ homebrew-cask-upgrade를 통한 Cask 업데이트 완료"
+    else
+        log_message "⚠️ homebrew-cask-upgrade 실행 실패, 대안 방법으로 전환"
+        update_casks
+    fi
 fi
 
 # =========================================
@@ -179,6 +230,14 @@ if ! command -v topgrade &> /dev/null; then
     if ! brew install topgrade; then
         handle_error "topgrade 설치 실패"
     fi
+fi
+
+# topgrade 실행 전에 brew cu 문제 해결
+log_message "topgrade 실행 전에 brew cu 호환성 문제를 해결합니다..."
+
+# homebrew-cask-upgrade 플러그인 제거 (호환성 문제로 인해)
+if brew untap buo/cask-upgrade 2>/dev/null; then
+    log_message "✅ 호환성 문제가 있는 homebrew-cask-upgrade 플러그인 제거 완료"
 fi
 
 # topgrade 실행 (안드로이드 스튜디오 비활성화)
