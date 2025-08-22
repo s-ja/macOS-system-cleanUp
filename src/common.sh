@@ -63,7 +63,8 @@ setup_logging() {
 # 통합 로깅 함수 (로그 파일이 설정된 경우 자동 사용)
 log_message() {
     local message="$1"
-    local timestamp="$(date +"%Y-%m-%d %H:%M:%S")"
+    local timestamp
+    timestamp="$(date +"%Y-%m-%d %H:%M:%S")"
     
     # 입력 검증
     if [[ -z "$message" ]]; then
@@ -173,9 +174,9 @@ calculate_space_saved() {
     local saved=$((after - before))
     
     if [ "$saved" -gt 0 ]; then
-        echo "$(format_disk_space "$saved")"
+        format_disk_space "$saved"
     elif [ "$saved" -lt 0 ]; then
-        echo "-$(format_disk_space $((-saved)))"
+        echo "-$(format_disk_space "$((-saved))")"
     else
         echo "0B"
     fi
@@ -549,15 +550,15 @@ show_spinner() {
     local pid="$1"
     local description="${2:-작업 중}"
     local delay=0.1
-    local spinstr='|/-\'
-    
+    local spinstr="|/-\\"
+    local i=0
+
     while kill -0 "$pid" 2>/dev/null; do
-        local temp=${spinstr#?}
-        printf "\r%s %c" "$description" "$spinstr"
-        local spinstr=$temp${spinstr%"$temp"}
-        sleep $delay
+        i=$(((i + 1) % 4))
+        printf "\r%s %c" "$description" "${spinstr:$i:1}"
+        sleep "$delay"
     done
-    
+
     printf "\r%s 완료\n" "$description"
 }
 
@@ -768,7 +769,7 @@ safe_clear_cache() {
     
     if [[ "$dry_run" == "true" ]]; then
         local file_count
-        file_count=$(find "$cache_path" -type f -mtime +$max_age_days 2>/dev/null | wc -l)
+        file_count=$(find "$cache_path" -type f -mtime +"$max_age_days" 2>/dev/null | wc -l)
         log_info "DRY RUN: $file_count개의 파일이 삭제 예정입니다"
         return 0
     fi
@@ -779,7 +780,7 @@ safe_clear_cache() {
         if rm -f "$file" 2>/dev/null; then
             ((deleted_count++))
         fi
-    done < <(find "$cache_path" -type f -mtime +$max_age_days -print0 2>/dev/null)
+    done < <(find "$cache_path" -type f -mtime +"$max_age_days" -print0 2>/dev/null)
     
     if [[ $deleted_count -gt 0 ]]; then
         log_success "캐시 정리 완료: $deleted_count개 파일 삭제"
@@ -794,7 +795,8 @@ safe_clear_cache() {
 create_backup() {
     local source_path="$1"
     local backup_dir="${2:-$HOME/.macos_utility_backups}"
-    local timestamp=$(date +"%Y%m%d_%H%M%S")
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
     
     if [[ ! -e "$source_path" ]]; then
         log_warning "백업할 경로가 존재하지 않습니다: $source_path"
@@ -807,7 +809,8 @@ create_backup() {
         return 1
     }
     
-    local backup_name="$(basename "$source_path")_backup_$timestamp"
+    local backup_name
+    backup_name="$(basename "$source_path")_backup_$timestamp"
     local backup_path="$backup_dir/$backup_name"
     
     log_info "백업 생성 중: $source_path -> $backup_path"

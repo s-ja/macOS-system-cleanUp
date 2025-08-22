@@ -16,7 +16,6 @@ Automated maintenance script for cleaning up your macOS system, freeing disk spa
 
 **Key Features:**
 
-- Cross-shell compatibility (works with both zsh and bash)
 - Comprehensive system cleanup (caches, logs, temporary files)
 - Development tool cleanup (Homebrew, npm, Yarn, Docker, Android Studio)
 - Selective cleanup with skip options (`--no-brew`, `--no-npm`, `--no-docker`, `--no-android`)
@@ -59,7 +58,6 @@ macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지�
 
 **주요 기능:**
 
-- 크로스 쉘 호환성 (zsh와 bash 모두에서 작동)
 - 종합적인 시스템 정리(캐시, 로그, 임시 파일)
 - 개발 도구 정리(Homebrew, npm, Yarn, Docker, Android Studio)
 - 선택적 정리를 위한 스킵 옵션(`--no-brew`, `--no-npm`, `--no-docker`, `--no-android`)
@@ -71,14 +69,6 @@ macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지�
 #### 시스템 업그레이드 유틸리티
 
 macOS 시스템의 패키지와 애플리케이션을 최신 상태로 유지하기 위한 자동화된 업그레이드 스크립트입니다.
-
-**주요 기능:**
-
-- 크로스 쉘 호환성 (zsh와 bash 모두에서 작동)
-- 자동 패키지 관리자 업데이트 (Homebrew, Cask, topgrade)
-- 스마트 애플리케이션 감지 및 관리
-- 세밀한 제어를 위한 포괄적인 명령줄 옵션
-- 드라이 런 모드와 사용자 확인을 통한 안전한 작업
 
 [시스템 업그레이드 유틸리티에 대해 자세히 알아보기](docs/upgrade/README.md)
 

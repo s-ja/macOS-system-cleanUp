@@ -120,7 +120,7 @@ INSTALLED_APPS="$TEMP_DIR/apps_installed.txt"
 AVAILABLE_CASKS="$TEMP_DIR/casks_available.txt"
 
 # 종료 시 임시 파일 정리 설정
-trap "cleanup_temp_files '$TEMP_DIR'" EXIT
+trap 'cleanup_temp_files "$TEMP_DIR"' EXIT
 
 # 시스템 상태 확인 함수 (개선된 버전)
 verify_system_state() {
@@ -400,14 +400,14 @@ else
         fi
         
         # 안드로이드 스튜디오 업데이트 확인 (AUTO_YES 모드 지원)
-        local should_update=false
+        should_update=false
         if [[ "$AUTO_YES" == "true" ]]; then
             should_update=true
             log_info "자동 확인 모드: 안드로이드 스튜디오 업데이트 진행"
         elif confirm_action "안드로이드 스튜디오를 업데이트하시겠습니까?" "y" 30; then
             should_update=true
         fi
-        
+
         if [[ "$should_update" == "true" ]]; then
             log_info "안드로이드 스튜디오 업데이트를 시작합니다..."
             
@@ -512,18 +512,18 @@ elif command_exists brew; then
         done
         echo ""
         
-        local should_install=false
+        should_install=false
         if [[ "$AUTO_YES" == "true" ]]; then
             should_install=true
             log_info "자동 확인 모드: 발견된 앱들을 설치합니다"
         elif confirm_action "이 앱들을 Homebrew Cask로 설치하시겠습니까?" "y" 30; then
             should_install=true
         fi
-        
+
         if [[ "$should_install" == "true" ]]; then
             log_info "설치를 시작합니다..."
-            local installed_count=0
-            local total_count=${#found_apps[@]}
+            installed_count=0
+            total_count=${#found_apps[@]}
             
             for app in "${found_apps[@]}"; do
                 ((installed_count++))
