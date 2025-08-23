@@ -621,6 +621,11 @@ Closes #123
 - [ ] 적절한 주석이 추가되었는지 확인
 - [ ] 에러 처리가 포함되었는지 확인
 - [ ] 테스트가 통과하는지 확인
+  - `shellcheck src/*.sh`
+    - 실패 시: 스크립트 문법 오류를 수정하고 `logs/shellcheck.log`를 확인
+  - `bash scripts/run_tests.sh`
+    - 실패 시: 테스트 코드를 점검하고 `logs/test.log`를 확인
+  - Docker, npm 등 추가 테스트 범위가 생기면 동일한 형식으로 위 목록을 확장
 
 ### **커밋 품질**
 
