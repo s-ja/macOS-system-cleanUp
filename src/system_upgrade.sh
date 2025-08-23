@@ -175,27 +175,45 @@ update_casks() {
     local updated_count=0
     local failed_count=0
     
-    # 설치된 cask 목록 가져오기
-    local installed_casks=$(brew list --cask 2>/dev/null || echo "")
+    log_message "업데이트가 필요한 Cask를 확인 중..."
     
-    if [ -n "$installed_casks" ]; then
+    # brew outdated 명령으로 업데이트가 필요한 Cask만 가져오기
+    local outdated_casks=$(brew outdated --cask 2>/dev/null || echo "")
+    
+    if [ -n "$outdated_casks" ]; then
+        local total_outdated=$(echo "$outdated_casks" | wc -l | tr -d ' ')
+        log_message "총 $total_outdated개의 Cask가 업데이트가 필요합니다."
+        
+        # 각 outdated Cask를 순차적으로 처리
         while IFS= read -r cask; do
             if [ -n "$cask" ]; then
-                log_message "Cask '$cask' 업데이트 중..."
+                log_message "🔄 $cask 업데이트 실행 중..."
+                
+                # 실제 업데이트 실행
                 if brew upgrade --cask "$cask" 2>/dev/null; then
-                    ((updated_count++))
+                    updated_count=$((updated_count + 1))
                     log_message "✅ $cask 업데이트 완료"
                 else
-                    ((failed_count++))
+                    failed_count=$((failed_count + 1))
                     log_message "⚠️ $cask 업데이트 실패 (정상적인 상황일 수 있음)"
                 fi
+                
+                # 안정성을 위한 짧은 대기
+                sleep 1
             fi
-        done <<< "$installed_casks"
+        done <<< "$outdated_casks"
         
-        log_message "Cask 업데이트 결과: $updated_count개 성공, $failed_count개 실패"
+        log_message "========================================="
+        log_message "Cask 업데이트 결과 요약:"
+        log_message "   성공: $updated_count개"
+        log_message "   실패: $failed_count개"
+        log_message "========================================="
     else
-        log_message "업데이트할 Cask가 없습니다."
+        log_message "✅ 모든 Cask가 최신 버전입니다. 업데이트가 필요하지 않습니다."
     fi
+    
+    # 간단한 상태 메시지
+    log_message "Cask 업데이트 프로세스 완료"
 }
 
 # 안정적인 Cask 업데이트 실행
@@ -222,57 +240,59 @@ if ! topgrade --disable android_studio --yes; then
 fi
 
 # =========================================
-# 안드로이드 스튜디오 별도 관리
+# 안드로이드 스튜디오 별도 관리 (주석 처리됨)
 # =========================================
-log_message "안드로이드 스튜디오 업데이트를 확인합니다..."
+# log_message "안드로이드 스튜디오 업데이트를 확인합니다..."
 
-if command -v studio &> /dev/null || command -v android-studio &> /dev/null || [[ -d "/Applications/Android Studio.app" ]]; then
-    # 현재 버전 확인 (개선된 방법)
-    if command -v brew &> /dev/null; then
-        # brew info 출력에서 버전 정보 추출 (여러 방법 시도)
-        current_version=""
-        
-        # 방법 1: 첫 번째 줄에서 버전 추출 (예: android-studio: 2025.1.2.11)
-        current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
-        
-        # 방법 2: Caskroom 경로에서 버전 추출 (fallback)
-        if [[ -z "$current_version" ]]; then
-            current_version=$(brew info --cask android-studio 2>/dev/null | grep "Caskroom" | grep -o '[0-9][0-9.]*[0-9]' | head -1)
-        fi
-        
-        # 방법 3: 일반적인 버전 패턴 검색 (fallback)
-        if [[ -z "$current_version" ]]; then
-            current_version=$(brew info --cask android-studio 2>/dev/null | grep -o '[0-9]\{4\}\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
-        fi
-        
-        if [[ -n "$current_version" ]]; then
-            log_message "현재 안드로이드 스튜디오 버전: $current_version"
-        else
-            log_message "안드로이드 스튜디오가 설치되어 있지만 버전 정보를 가져올 수 없습니다"
-        fi
-    fi
-    
-    # 안드로이드 스튜디오 업데이트 확인
-    log_message "안드로이드 스튜디오를 업데이트하시겠습니까? (y/n)"
-    read -r update_android_studio
-    if [[ "$update_android_studio" =~ ^[Yy]$ ]]; then
-        log_message "안드로이드 스튜디오 업데이트를 시작합니다..."
-        
-        if command -v brew &> /dev/null; then
-            if brew upgrade --cask android-studio 2>/dev/null; then
-                log_message "✅ 안드로이드 스튜디오 업데이트 완료"
-            else
-                log_message "⚠️ 안드로이드 스튜디오 업데이트 실패 (이미 최신 버전이거나 정상적인 상황일 수 있음)"
-            fi
-        else
-            log_message "⚠️ Homebrew가 없어 안드로이드 스튜디오를 업데이트할 수 없습니다"
-        fi
-    else
-        log_message "안드로이드 스튜디오 업데이트를 건너뜁니다."
-    fi
-else
-    log_message "안드로이드 스튜디오가 설치되어 있지 않습니다."
-fi
+# if command -v studio &> /dev/null || command -v android-studio &> /dev/null || [[ -d "/Applications/Android Studio.app" ]]; then
+#     # 현재 버전 확인 (개선된 방법)
+#     if command -v brew &> /dev/null; then
+#         # brew info 출력에서 버전 정보 추출 (여러 방법 시도)
+#         current_version=""
+#         
+#         # 방법 1: 첫 번째 줄에서 버전 추출 (예: android-studio: 2025.1.2.11)
+#         current_version=$(brew info --cask android-studio 2>/dev/null | head -1 | sed -n 's/.*android-studio: \([0-9][0-9.]*\).*/\1/p')
+#         
+#         # 방법 2: Caskroom 경로에서 버전 추출 (fallback)
+#         if [[ -z "$current_version" ]]; then
+#             current_version=$(brew info --cask android-studio 2>/dev/null | grep "Caskroom" | grep -o '[0-9][0-9.]*[0-9]' | head -1)
+#         fi
+#         
+#         # 방법 3: 일반적인 버전 패턴 검색 (fallback)
+#         if [[ -z "$current_version" ]]; then
+#             current_version=$(brew info --cask android-studio 2>/dev/null | grep -o '[0-9]\{4\}\.[0-9]\+\.[0-9]\+\.[0-9]\+' | head -1)
+#         fi
+#         
+#         if [[ -n "$current_version" ]]; then
+#             log_message "현재 안드로이드 스튜디오 버전: $current_version"
+#         else
+#             log_message "안드로이드 스튜디오가 설치되어 있지만 버전 정보를 가져올 수 없습니다"
+#         fi
+#     fi
+#     
+#     # 안드로이드 스튜디오 업데이트 확인
+#     log_message "안드로이드 스튜디오를 업데이트하시겠습니까? (y/n)"
+#     read -r update_android_studio
+#     if [[ "$update_android_studio" =~ ^[Yy]$ ]]; then
+#         log_message "안드로이드 스튜디오 업데이트를 시작합니다..."
+#         
+#         if command -v brew &> /dev/null; then
+#             if brew upgrade --cask android-studio 2>/dev/null; then
+#                 log_message "✅ 안드로이드 스튜디오 업데이트 완료"
+#             else
+#                 log_message "⚠️ 안드로이드 스튜디오 업데이트 실패 (이미 최신 버전이거나 정상적인 상황일 수 있음)"
+#             fi
+#         else
+#             log_message "⚠️ Homebrew가 없어 안드로이드 스튜디오를 업데이트할 수 없습니다"
+#         fi
+#     else
+#         log_message "안드로이드 스튜디오 업데이트를 건너뜁니다."
+#     fi
+# else
+#     log_message "안드로이드 스튜디오가 설치되어 있지 않습니다."
+# fi
+
+log_message "안드로이드 스튜디오 업데이트 기능이 비활성화되었습니다."
 
 # =========================================
 # 새로운 앱 검색 및 설치
