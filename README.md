@@ -30,6 +30,20 @@ Automated upgrade script for keeping your macOS system's packages and applicatio
 
 [Learn more about System Upgrade Utility](docs/upgrade.md)
 
+#### System Restore Utility
+
+Comprehensive system restore utility for macOS systems that have been completely formatted and need to restore all applications and settings from a clean state.
+
+**Key Features:**
+
+- Complete system backup (Homebrew, npm, system settings, app preferences, Android Studio)
+- Automated system restore with selective component restoration
+- Smart backup detection and validation
+- Enhanced safety features with dry-run mode and confirmation prompts
+- Comprehensive logging and error recovery
+
+[Learn more about System Restore Utility](docs/restore/README.md)
+
 ### Quick Links
 
 - [Installation Guide](docs/installation.md)
@@ -71,6 +85,20 @@ macOS 시스템의 디스크 공간을 확보하고 시스템 상태를 유지�
 macOS 시스템의 패키지와 애플리케이션을 최신 상태로 유지하기 위한 자동화된 업그레이드 스크립트입니다.
 
 [시스템 업그레이드 유틸리티에 대해 자세히 알아보기](docs/upgrade.md)
+
+#### 시스템 복원 유틸리티
+
+완전히 포맷된 macOS 시스템에서 클린 상태로부터 모든 애플리케이션과 설정을 복원해야 하는 경우를 위한 포괄적인 시스템 복원 유틸리티입니다.
+
+**주요 기능:**
+
+- 완전한 시스템 백업(Homebrew, npm, 시스템 설정, 앱 설정, Android Studio)
+- 선택적 구성 요소 복원을 통한 자동화된 시스템 복원
+- 스마트 백업 감지 및 검증
+- 드라이 런 모드와 확인 프롬프트를 통한 향상된 안전 기능
+- 포괄적인 로깅 및 오류 복구
+
+[시스템 복원 유틸리티에 대해 자세히 알아보기](docs/restore/README.kr.md)
 
 ### 빠른 링크
 

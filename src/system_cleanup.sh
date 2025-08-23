@@ -307,9 +307,24 @@ else
             log_message "Found the following local snapshots:"
             echo "$local_snapshots" | tee -a "$LOG_FILE"
             
-            # 스냅샷 개수 계산
-            snapshot_count=$(echo "$local_snapshots" | wc -l)
-            log_message "총 ${snapshot_count}개의 로컬 스냅샷이 있습니다"
+            # 스냅샷 개수 계산 - 개선된 버전
+            snapshot_count=0
+            if [ -n "$local_snapshots" ]; then
+                # 헤더 라인("Snapshots for disk /:")을 제외하고 실제 스냅샷만 카운트
+                snapshot_count=$(echo "$local_snapshots" | grep -v "Snapshots for disk" | grep -v "^$" | wc -l | tr -d ' ')
+                
+                # 디버그 정보 출력 (선택사항)
+                log_message "DEBUG: Raw snapshot output lines: $(echo "$local_snapshots" | wc -l)"
+                log_message "DEBUG: Filtered snapshot count: $snapshot_count"
+            fi
+            
+            # 스냅샷 개수 검증
+            if [ "$snapshot_count" -gt 0 ] 2>/dev/null; then
+                log_message "총 ${snapshot_count}개의 로컬 스냅샷이 있습니다"
+            else
+                log_message "스냅샷 개수를 정확히 계산할 수 없습니다. 수동으로 확인이 필요합니다."
+                snapshot_count=0
+            fi
             
             if [[ "$AUTO_CLEAN" == true ]]; then
                 log_message "자동 정리 모드: 로컬 스냅샷 정리 중..."
@@ -328,9 +343,24 @@ else
             fi
         else
             log_message "No local snapshots found"
+            snapshot_count=0
+        fi
+        
+        # 스냅샷 정리 후 상태 확인
+        if [ "$snapshot_count" -gt 0 ] 2>/dev/null; then
+            log_message "스냅샷 정리 후 상태를 확인합니다..."
+            remaining_snapshots=$(tmutil listlocalsnapshots / 2>/dev/null)
+            if [ -n "$remaining_snapshots" ]; then
+                # 헤더 라인을 제외하고 실제 스냅샷만 카운트
+                remaining_count=$(echo "$remaining_snapshots" | grep -v "Snapshots for disk" | grep -v "^$" | wc -l | tr -d ' ')
+                log_message "정리 후 남은 스냅샷: ${remaining_count}개"
+            else
+                log_message "모든 로컬 스냅샷이 정리되었습니다."
+            fi
         fi
     else
         log_message "tmutil command not found, skipping Time Machine cleanup"
+        snapshot_count=0
     fi
 fi
 

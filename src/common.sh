@@ -16,11 +16,10 @@ setup_logging() {
     touch "$log_file" || {
         echo "🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요"
         exit 1
-<<<<<<< HEAD
-    fi
+    }
     
     # 성공 시 로그 파일 경로 반환
-    echo "$LOG_FILE"
+    echo "$log_file"
 }
 
 # 통합 로깅 함수 (로그 파일이 설정된 경우 자동 사용)
@@ -196,51 +195,453 @@ create_temp_dir() {
     # 권한 설정
     chmod 700 "$temp_dir" || {
         handle_error "임시 디렉토리 권한 설정 실패" "true"
-=======
->>>>>>> origin/main
     }
     
-    echo "$log_file"
+    echo "$temp_dir"
 }
 
-# 메시지 로깅 함수
-log_message() {
-    local log_file="$1"
-    local message="$2"
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - $message" | tee -a "$log_file"
-}
+# ==============================================
+# 앱 백업 및 복원 함수들
+# ==============================================
 
-# 오류 처리 함수
-handle_error() {
-    local log_file="$1"
-    local error_message="$2"
-    echo "ERROR: $error_message" | tee -a "$log_file"
-    echo "Continuing with next task..." | tee -a "$log_file"
-    return 1
-}
-
-# 디스크 공간 포맷 함수
-format_disk_space() {
-    local space=$1
-    if [ $space -ge 1073741824 ]; then
-        echo "$(echo "scale=2; $space/1073741824" | bc)GB"
-    elif [ $space -ge 1048576 ]; then
-        echo "$(echo "scale=2; $space/1048576" | bc)MB"
-    elif [ $space -ge 1024 ]; then
-        echo "$(echo "scale=2; $space/1024" | bc)KB"
+# Homebrew Bundle 백업 생성
+backup_homebrew_bundle() {
+    local backup_dir="${1:-$HOME/.macos_utility_backups}"
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    
+    # 백업 디렉토리 생성
+    mkdir -p "$backup_dir" || {
+        handle_error "백업 디렉토리 생성 실패: $backup_dir"
+        return 1
+    }
+    
+    local bundle_file="$backup_dir/Brewfile_$timestamp"
+    
+    log_info "Homebrew Bundle 백업 생성 중..."
+    
+    if brew bundle dump --file="$bundle_file" 2>/dev/null; then
+        log_success "Homebrew Bundle 백업 완료: $bundle_file"
+        echo "$bundle_file"
+        return 0
     else
-        echo "${space}B"
+        handle_error "Homebrew Bundle 백업 실패"
+        return 1
     fi
 }
 
-# 공간 절약 계산 함수
-calculate_space_saved() {
-    local before=$1
-    local after=$2
+# npm 전역 패키지 백업
+backup_npm_globals() {
+    local backup_dir="${1:-$HOME/.macos_utility_backups}"
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
     
-<<<<<<< HEAD
-    # 중단 시그널 처리 (Ctrl+C, TERM)
-    trap 'log_warning "스크립트가 중단되었습니다"; exit 130' INT TERM
+    # 백업 디렉토리 생성
+    mkdir -p "$backup_dir" || {
+        handle_error "백업 디렉토리 생성 실패: $backup_dir"
+        return 1
+    }
+    
+    local npm_file="$backup_dir/npm_globals_$timestamp.txt"
+    
+    log_info "npm 전역 패키지 백업 생성 중..."
+    
+    if npm list -g --depth=0 > "$npm_file" 2>/dev/null; then
+        log_success "npm 전역 패키지 백업 완료: $npm_file"
+        echo "$npm_file"
+        return 0
+    else
+        handle_error "npm 전역 패키지 백업 실패"
+        return 1
+    fi
+}
+
+# 시스템 설정 백업
+backup_system_settings() {
+    local backup_dir="${1:-$HOME/.macos_utility_backups}"
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    
+    # 백업 디렉토리 생성
+    mkdir -p "$backup_dir" || {
+        handle_error "백업 디렉토리 생성 실패: $backup_dir"
+        return 1
+    }
+    
+    local settings_file="$backup_dir/system_settings_$timestamp.txt"
+    
+    log_info "시스템 설정 백업 생성 중..."
+    
+    if defaults read > "$settings_file" 2>/dev/null; then
+        log_success "시스템 설정 백업 완료: $settings_file"
+        echo "$settings_file"
+        return 0
+    else
+        handle_error "시스템 설정 백업 실패"
+        return 1
+    fi
+}
+
+# 앱 설정 백업
+backup_app_preferences() {
+    local backup_dir="${1:-$HOME/.macos_utility_backups}"
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    
+    # 백업 디렉토리 생성
+    mkdir -p "$backup_dir" || {
+        handle_error "백업 디렉토리 생성 실패: $backup_dir"
+        return 1
+    }
+    
+    local prefs_dir="$backup_dir/preferences_$timestamp"
+    
+    log_info "앱 설정 백업 생성 중..."
+    
+    if [ -d "$HOME/Library/Preferences" ]; then
+        if cp -R "$HOME/Library/Preferences" "$prefs_dir" 2>/dev/null; then
+            log_success "앱 설정 백업 완료: $prefs_dir"
+            echo "$prefs_dir"
+            return 0
+        else
+            handle_error "앱 설정 백업 실패"
+            return 1
+        fi
+    else
+        log_warning "Preferences 디렉토리를 찾을 수 없습니다"
+        return 1
+    fi
+}
+
+# Android Studio 설정 백업
+backup_android_studio() {
+    local backup_dir="${1:-$HOME/.macos_utility_backups}"
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    
+    # 백업 디렉토리 생성
+    mkdir -p "$backup_dir" || {
+        handle_error "백업 디렉토리 생성 실패: $backup_dir"
+        return 1
+    }
+    
+    local android_dir="$backup_dir/android_studio_$timestamp"
+    
+    log_info "Android Studio 설정 백업 생성 중..."
+    
+    # Android Studio 관련 디렉토리들 백업
+    local android_paths=(
+        "$HOME/.android"
+        "$HOME/Library/Application Support/Google/AndroidStudio*"
+        "$HOME/Library/Preferences/com.google.android.studio.plist"
+        "$HOME/Library/Preferences/com.android.Emulator.plist"
+    )
+    
+    local backup_created=false
+    
+    for path in "${android_paths[@]}"; do
+        if [ -e "$path" ]; then
+            local target_dir="$android_dir/$(basename "$path")"
+            if cp -R "$path" "$target_dir" 2>/dev/null; then
+                log_info "백업 완료: $path"
+                backup_created=true
+            else
+                log_warning "백업 실패: $path"
+            fi
+        fi
+    done
+    
+    if [ "$backup_created" = true ]; then
+        log_success "Android Studio 설정 백업 완료: $android_dir"
+        echo "$android_dir"
+        return 0
+    else
+        log_warning "Android Studio 관련 파일을 찾을 수 없습니다"
+        return 1
+    fi
+}
+
+# 전체 시스템 백업 (포맷 전)
+backup_full_system() {
+    local backup_dir="${1:-$HOME/.macos_utility_backups}"
+    local timestamp
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    
+    # 백업 디렉토리 생성
+    mkdir -p "$backup_dir" || {
+        handle_error "백업 디렉토리 생성 실패: $backup_dir"
+        return 1
+    }
+    
+    local system_backup_dir="$backup_dir/full_system_$timestamp"
+    
+    log_info "전체 시스템 백업 시작..."
+    
+    # 백업 디렉토리 생성
+    mkdir -p "$system_backup_dir" || {
+        handle_error "시스템 백업 디렉토리 생성 실패"
+        return 1
+    }
+    
+    # 각 백업 함수 실행
+    local backup_results=()
+    
+    # Homebrew Bundle 백업
+    if homebrew_backup=$(backup_homebrew_bundle "$system_backup_dir"); then
+        backup_results+=("Homebrew: $homebrew_backup")
+    fi
+    
+    # npm 전역 패키지 백업
+    if npm_backup=$(backup_npm_globals "$system_backup_dir"); then
+        backup_results+=("npm: $npm_backup")
+    fi
+    
+    # 시스템 설정 백업
+    if settings_backup=$(backup_system_settings "$system_backup_dir"); then
+        backup_results+=("System Settings: $settings_backup")
+    fi
+    
+    # 앱 설정 백업
+    if prefs_backup=$(backup_app_preferences "$system_backup_dir"); then
+        backup_results+=("App Preferences: $prefs_backup")
+    fi
+    
+    # Android Studio 설정 백업
+    if android_backup=$(backup_android_studio "$system_backup_dir"); then
+        backup_results+=("Android Studio: $android_backup")
+    fi
+    
+    # 백업 요약 생성
+    local summary_file="$system_backup_dir/backup_summary.txt"
+    {
+        echo "macOS System Backup Summary"
+        echo "=========================="
+        echo "Backup Date: $(date)"
+        echo "Backup Directory: $system_backup_dir"
+        echo ""
+        echo "Backup Contents:"
+        for result in "${backup_results[@]}"; do
+            echo "- $result"
+        done
+        echo ""
+        echo "Restore Instructions:"
+        echo "1. Run: ./src/system_restore.sh --restore-from=$system_backup_dir"
+        echo "2. Or manually restore each component"
+    } > "$summary_file"
+    
+    log_success "전체 시스템 백업 완료: $system_backup_dir"
+    log_info "백업 요약: $summary_file"
+    
+    echo "$system_backup_dir"
+    return 0
+}
+
+# Homebrew Bundle 복원
+restore_homebrew_bundle() {
+    local bundle_file="$1"
+    
+    if [[ ! -f "$bundle_file" ]]; then
+        handle_error "Bundle 파일을 찾을 수 없습니다: $bundle_file"
+        return 1
+    fi
+    
+    log_info "Homebrew Bundle 복원 중..."
+    
+    if brew bundle --file="$bundle_file" 2>/dev/null; then
+        log_success "Homebrew Bundle 복원 완료"
+        return 0
+    else
+        handle_error "Homebrew Bundle 복원 실패"
+        return 1
+    fi
+}
+
+# npm 전역 패키지 복원
+restore_npm_globals() {
+    local npm_file="$1"
+    
+    if [[ ! -f "$npm_file" ]]; then
+        handle_error "npm 백업 파일을 찾을 수 없습니다: $npm_file"
+        return 1
+    fi
+    
+    log_info "npm 전역 패키지 복원 중..."
+    
+    # npm 패키지 목록에서 패키지명만 추출하여 설치
+    local packages
+    packages=$(grep -v "npm" "$npm_file" | awk '{print $2}' | grep -v "empty" | grep -v "UNMET" | grep -v "npm ERR!")
+    
+    if [[ -n "$packages" ]]; then
+        for package in $packages; do
+            if [[ -n "$package" && "$package" != "npm" ]]; then
+                log_info "npm 패키지 설치 중: $package"
+                if npm install -g "$package" 2>/dev/null; then
+                    log_info "✅ $package 설치 완료"
+                else
+                    log_warning "⚠️ $package 설치 실패"
+                fi
+            fi
+        done
+        log_success "npm 전역 패키지 복원 완료"
+    else
+        log_warning "복원할 npm 패키지가 없습니다"
+    fi
+    
+    return 0
+}
+
+# 시스템 설정 복원
+restore_system_settings() {
+    local settings_file="$1"
+    
+    if [[ ! -f "$settings_file" ]]; then
+        handle_error "시스템 설정 백업 파일을 찾을 수 없습니다: $settings_file"
+        return 1
+    fi
+    
+    log_info "시스템 설정 복원 중..."
+    log_warning "⚠️ 시스템 설정 복원은 수동으로 진행해야 합니다"
+    log_info "백업 파일: $settings_file"
+    log_info "각 설정을 개별적으로 확인하고 복원하세요"
+    
+    return 0
+}
+
+# 앱 설정 복원
+restore_app_preferences() {
+    local prefs_dir="$1"
+    
+    if [[ ! -d "$prefs_dir" ]]; then
+        handle_error "앱 설정 백업 디렉토리를 찾을 수 없습니다: $prefs_dir"
+        return 1
+    fi
+    
+    log_info "앱 설정 복원 중..."
+    
+    # 기존 Preferences 디렉토리 백업
+    if [ -d "$HOME/Library/Preferences" ]; then
+        local backup_prefs="$HOME/Library/Preferences.backup.$(date +%s)"
+        if cp -R "$HOME/Library/Preferences" "$backup_prefs" 2>/dev/null; then
+            log_info "기존 설정 백업: $backup_prefs"
+        fi
+    fi
+    
+    # 백업된 설정 복원
+    if cp -R "$prefs_dir"/* "$HOME/Library/Preferences/" 2>/dev/null; then
+        log_success "앱 설정 복원 완료"
+        return 0
+    else
+        handle_error "앱 설정 복원 실패"
+        return 1
+    fi
+}
+
+# Android Studio 설정 복원
+restore_android_studio() {
+    local android_dir="$1"
+    
+    if [[ ! -d "$android_dir" ]]; then
+        handle_error "Android Studio 백업 디렉토리를 찾을 수 없습니다: $android_dir"
+        return 1
+    fi
+    
+    log_info "Android Studio 설정 복원 중..."
+    
+    # 각 백업된 디렉토리 복원
+    for backup_path in "$android_dir"/*; do
+        if [ -d "$backup_path" ]; then
+            local dir_name=$(basename "$backup_path")
+            local target_path="$HOME"
+            
+            case "$dir_name" in
+                ".android")
+                    target_path="$HOME/.android"
+                    ;;
+                "AndroidStudio"*)
+                    target_path="$HOME/Library/Application Support/Google/"
+                    ;;
+                "preferences_*")
+                    target_path="$HOME/Library/Preferences/"
+                    ;;
+            esac
+            
+            if [ -d "$target_path" ]; then
+                if cp -R "$backup_path"/* "$target_path/" 2>/dev/null; then
+                    log_info "복원 완료: $dir_name"
+                else
+                    log_warning "복원 실패: $dir_name"
+                fi
+            fi
+        fi
+    done
+    
+    log_success "Android Studio 설정 복원 완료"
+    return 0
+}
+
+# 전체 시스템 복원
+restore_full_system() {
+    local backup_dir="$1"
+    
+    if [[ ! -d "$backup_dir" ]]; then
+        handle_error "백업 디렉토리를 찾을 수 없습니다: $backup_dir"
+        return 1
+    fi
+    
+    log_info "전체 시스템 복원 시작..."
+    
+    # 백업 요약 파일 확인
+    local summary_file="$backup_dir/backup_summary.txt"
+    if [ -f "$summary_file" ]; then
+        log_info "백업 요약:"
+        cat "$summary_file" | tee -a "$LOG_FILE"
+    fi
+    
+    # 각 백업 파일 찾기 및 복원
+    local restored_count=0
+    
+    # Homebrew Bundle 복원
+    for bundle_file in "$backup_dir"/Brewfile_*; do
+        if [ -f "$bundle_file" ]; then
+            if restore_homebrew_bundle "$bundle_file"; then
+                ((restored_count++))
+            fi
+            break
+        fi
+    done
+    
+    # npm 전역 패키지 복원
+    for npm_file in "$backup_dir"/npm_globals_*; do
+        if [ -f "$npm_file" ]; then
+            if restore_npm_globals "$npm_file"; then
+                ((restored_count++))
+            fi
+            break
+        fi
+    done
+    
+    # 앱 설정 복원
+    for prefs_dir in "$backup_dir"/preferences_*; do
+        if [ -d "$prefs_dir" ]; then
+            if restore_app_preferences "$prefs_dir"; then
+                ((restored_count++))
+            fi
+            break
+        fi
+    done
+    
+    # Android Studio 설정 복원
+    for android_dir in "$backup_dir"/android_studio_*; do
+        if [ -d "$android_dir" ]; then
+            if restore_android_studio "$android_dir"; then
+                ((restored_count++))
+            fi
+            break
+        fi
+    done
+    
+    log_success "전체 시스템 복원 완료 ($restored_count개 구성 요소)"
+    return 0
 }
 
 # ==============================================
@@ -352,13 +753,6 @@ print_section_header() {
         echo "========================================="
         echo "섹션 $section_number: $section_title"
         echo "========================================="
-=======
-    if [[ $before =~ ^[0-9]+$ ]] && [[ $after =~ ^[0-9]+$ ]]; then
-        local saved=$((after - before))
-        echo "$(format_disk_space $saved)"
->>>>>>> origin/main
-    else
-        echo "Unable to calculate"
     fi
 }
 
@@ -369,7 +763,6 @@ check_sudo() {
     else
         return 1
     fi
-<<<<<<< HEAD
 }
 
 # 안전한 캐시 정리
@@ -442,6 +835,3 @@ create_backup() {
         return 1
     fi
 }
-=======
-} 
->>>>>>> origin/main
