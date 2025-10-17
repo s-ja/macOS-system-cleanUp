@@ -3,45 +3,39 @@
 # 에러 발생 시 스크립트 중단
 set -e
 
-# 스크립트 디렉토리 및 로깅 설정
+# 스크립트 디렉토리 설정
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-LOG_DIR="$PROJECT_ROOT/logs"
+
+# 공통 함수 import
+source "$SCRIPT_DIR/common.sh"
+
+# 로깅 초기화 (setup_logging으로 안전하게 로그 파일 생성)
+if ! LOG_FILE=$(setup_logging "upgrade"); then
+    echo "🛑 FATAL: 로깅 시스템 초기화 실패"
+    echo "logs 디렉토리 권한을 확인하세요: $PROJECT_ROOT/logs"
+    echo "해결 방법: sudo chown -R $(whoami):staff \"$PROJECT_ROOT/logs\""
+    exit 1
+fi
+
+# 임시 디렉토리 설정
 TEMP_DIR="/tmp/brew_replace"
 INSTALLED_APPS="$TEMP_DIR/apps_installed.txt"
 AVAILABLE_CASKS="$TEMP_DIR/casks_available.txt"
-LOG_FILE="$LOG_DIR/upgrade_$(date +"%Y%m%d_%H%M%S").log"
-
-# 로그 디렉토리 생성
-mkdir -p "$LOG_DIR"
 
 # 종료 시 임시 파일 정리 설정
 trap 'cleanup' EXIT
 
-# 로깅 함수
-log_message() {
-    local message="$1"
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $message" | tee -a "$LOG_FILE"
-}
-
-# 에러 처리 함수
-handle_error() {
-    local error_message="$1"
-    log_message "에러 발생: $error_message"
-    echo "Continuing with next task..."
-    # 종료 코드 1 대신 계속 진행
-}
-
 # 시스템 상태 확인 함수
 verify_system_state() {
     log_message "시스템 상태 확인 중..."
-    
+
     # Homebrew 상태 확인
     if ! brew doctor &>/dev/null; then
         log_message "⚠️ Homebrew 상태 이상 감지"
         log_message "Homebrew 캐시 재구성 및 강제 업데이트 시도..."
         if ! brew cleanup --prune=all && brew update --force; then
-            handle_error "Homebrew 복구 실패"
+            handle_error "Homebrew 복구 실패" false
             return 1
         fi
         log_message "✅ Homebrew 복구 완료"
@@ -51,7 +45,7 @@ verify_system_state() {
     if [ ! -d "/Library/Caches" ] || [ ! -w "/Library/Caches" ]; then
         log_message "⚠️ 시스템 캐시 디렉토리 접근 불가"
         if ! sudo mkdir -p /Library/Caches && sudo chmod 755 /Library/Caches; then
-            handle_error "시스템 캐시 디렉토리 생성/권한 설정 실패"
+            handle_error "시스템 캐시 디렉토리 생성/권한 설정 실패" false
             return 1
         fi
         log_message "✅ 시스템 캐시 디렉토리 복구 완료"
@@ -63,64 +57,61 @@ verify_system_state() {
         if [ -d "$dir" ] && [ ! -w "$dir" ]; then
             log_message "⚠️ $dir 디렉토리 권한 문제 감지"
             if ! sudo chown -R $(whoami) "$dir"; then
-                handle_error "$dir 권한 복구 실패"
+                handle_error "$dir 권한 복구 실패" false
                 return 1
             fi
             log_message "✅ $dir 권한 복구 완료"
         fi
     done
-    
+
     return 0
 }
 
 # 캐시 상태 확인 함수
 check_cache_state() {
     log_message "캐시 상태 확인 중..."
-    
+
     # Homebrew 캐시 확인
     if ! brew doctor &>/dev/null; then
         log_message "⚠️ Homebrew 캐시 재구성 필요"
         if ! brew cleanup --prune=all && brew update --force; then
-            handle_error "Homebrew 캐시 재구성 실패"
+            handle_error "Homebrew 캐시 재구성 실패" false
             return 1
         fi
         log_message "✅ Homebrew 캐시 재구성 완료"
-        
+
         # 캐시 재구성 후 안정화를 위한 대기
         log_message "시스템 안정화를 위해 10초 대기..."
         sleep 10
     fi
-    
+
     return 0
 }
 
 # 임시 파일 정리 함수
 cleanup() {
     log_message "임시 파일 정리 중..."
-    
+
     if [ -d "$TEMP_DIR" ]; then
         # 각 임시 파일 확인 및 삭제
         if [ -f "$INSTALLED_APPS" ]; then
             rm -f "$INSTALLED_APPS" && log_message "설치된 앱 목록 파일 제거 완료"
         fi
-        
+
         if [ -f "$AVAILABLE_CASKS" ]; then
             rm -f "$AVAILABLE_CASKS" && log_message "사용 가능한 Cask 목록 파일 제거 완료"
         fi
-        
+
         # 전체 임시 디렉토리 제거
         if rm -rf "$TEMP_DIR"; then
             log_message "✅ 임시 파일 정리 완료"
         else
-            handle_error "임시 파일 정리 실패"
+            handle_error "임시 파일 정리 실패" false
         fi
     else
         log_message "정리할 임시 파일이 없습니다"
     fi
 }
-
-# 종료 시 정리 함수 등록 (스크립트 종료 시에만 실행)
-# trap cleanup EXIT  # 이미 위에서 설정됨
 
 # 임시 디렉토리 생성 및 권한 설정
 log_message "임시 디렉토리 설정 중..."
@@ -139,13 +130,6 @@ if [ ! -w "$TEMP_DIR" ]; then
     fi
 fi
 
-# 로그 파일 초기화
-touch "$LOG_FILE" || {
-    log_message "🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요:"
-    log_message "chmod 755 $TEMP_DIR"
-    exit 1
-}
-
 # 스크립트 시작 로깅
 log_message "========================================="
 log_message "시스템 업그레이드 프로세스 시작"
@@ -162,7 +146,7 @@ check_cache_state || exit 1
 # =========================================
 log_message "Homebrew 업데이트를 시작합니다..."
 if ! brew update; then
-    handle_error "Homebrew 업데이트 실패"
+    handle_error "Homebrew 업데이트 실패" false
 fi
 
 # =========================================
@@ -227,7 +211,7 @@ log_message "topgrade를 실행하여 모든 패키지와 앱을 업데이트합
 if ! command -v topgrade &> /dev/null; then
     log_message "topgrade가 설치되어 있지 않습니다. 설치를 시작합니다..."
     if ! brew install topgrade; then
-        handle_error "topgrade 설치 실패"
+        handle_error "topgrade 설치 실패" false
     fi
 fi
 
@@ -236,7 +220,7 @@ log_message "topgrade 실행을 준비합니다..."
 
 # topgrade 실행 (안드로이드 스튜디오 비활성화)
 if ! topgrade --disable android_studio --yes; then
-    handle_error "topgrade 실행 실패"
+    handle_error "topgrade 실행 실패" false
 fi
 
 # =========================================
@@ -304,23 +288,23 @@ log_message "Homebrew Cask로 설치 가능한 앱을 검색합니다..."
 if [ ! -d "$TEMP_DIR" ]; then
     log_message "임시 디렉토리를 다시 생성합니다..."
     mkdir -p "$TEMP_DIR" || {
-        handle_error "임시 디렉토리 재생성 실패"
-        return 1
+        handle_error "임시 디렉토리 재생성 실패" false
+        exit 1
     }
 fi
 
 # 현재 설치된 Cask 목록 저장
 log_message "설치된 Cask 목록을 저장합니다..."
 if ! brew list --cask > "$INSTALLED_APPS" 2>/dev/null; then
-    handle_error "설치된 Cask 목록 저장 실패"
-    return 1
+    handle_error "설치된 Cask 목록 저장 실패" false
+    exit 1
 fi
 
 # 설치 가능한 Cask 목록 저장 (최적화된 검색)
 log_message "사용 가능한 Cask 목록을 저장합니다..."
 if ! brew search --casks "" 2>/dev/null | grep -v "No Cask found" > "$AVAILABLE_CASKS"; then
-    handle_error "사용 가능한 Cask 목록 저장 실패"
-    return 1
+    handle_error "사용 가능한 Cask 목록 저장 실패" false
+    exit 1
 fi
 
 # 발견된 앱을 저장할 배열
@@ -330,16 +314,16 @@ declare -a found_apps
 log_message "Applications 디렉토리에서 앱을 검색합니다..."
 if [ -d "/Applications" ]; then
     cd /Applications || {
-        handle_error "Applications 디렉토리 접근 실패"
-        return 1
+        handle_error "Applications 디렉토리 접근 실패" false
+        exit 1
     }
-    
+
     # 각 .app 파일에 대해 확인 (성능 최적화)
     while IFS= read -r -d '' app; do
         app_name="${app#./}"
         app_name="${app_name%.app}"
         cask_name="${app_name// /-}"
-        
+
         # 설치 가능한 Cask 목록에 있는지 확인
         if [ -f "$AVAILABLE_CASKS" ] && grep -Fxq "$cask_name" "$AVAILABLE_CASKS" 2>/dev/null; then
             # 이미 설치된 Cask 목록에 없는 경우
@@ -351,7 +335,7 @@ if [ -d "/Applications" ]; then
             fi
         fi
     done < <(find . -maxdepth 1 -name "*.app" -print0 2>/dev/null)
-    
+
     # 원래 디렉토리로 복귀
     cd - > /dev/null || true
 else

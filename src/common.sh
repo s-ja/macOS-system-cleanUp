@@ -4,22 +4,55 @@
 # 로그 디렉토리 설정 함수
 setup_logging() {
     local script_name="$1"
-    local script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local project_root="$(dirname "$(dirname "$script_dir")")"
+    
+    # 호출한 스크립트의 디렉토리를 찾기 위해 스택을 거슬러 올라감
+    local script_dir=""
+    local i=1
+    while [[ $i -lt ${#BASH_SOURCE[@]} ]]; do
+        local source_file="${BASH_SOURCE[$i]}"
+        if [[ "$source_file" != *"common.sh" ]]; then
+            script_dir="$(cd "$(dirname "$source_file")" && pwd)"
+            break
+        fi
+        ((i++))
+    done
+    
+    # fallback: 현재 작업 디렉토리 사용
+    if [[ -z "$script_dir" ]]; then
+        script_dir="$(pwd)"
+    fi
+    
+    local project_root="$(dirname "$script_dir")"
     local log_dir="$project_root/logs"
     local log_file="$log_dir/${script_name}_$(date +"%Y%m%d_%H%M%S").log"
     
-    # 로그 디렉토리 생성
-    mkdir -p "$log_dir"
+    # 로그 디렉토리 생성 시도
+    if mkdir -p "$log_dir" 2>/dev/null; then
+        # 로그 파일 생성 시도
+        if touch "$log_file" 2>/dev/null; then
+            echo "$log_file"
+            return 0
+        fi
+    fi
     
-    # 로그 파일 초기화
-    touch "$log_file" || {
-        echo "🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요"
+    # 권한 문제로 실패한 경우 홈 디렉토리에 로그 생성
+    local fallback_log_dir="$HOME/.macos-system-cleanup/logs"
+    mkdir -p "$fallback_log_dir"
+    local fallback_log_file="$fallback_log_dir/${script_name}_$(date +"%Y%m%d_%H%M%S").log"
+    
+    if touch "$fallback_log_file" 2>/dev/null; then
+        echo "⚠️  WARNING: 프로젝트 logs 디렉토리에 권한이 없습니다." >&2
+        echo "⚠️  WARNING: 대체 위치에 로그를 생성합니다: $fallback_log_file" >&2
+        echo "⚠️  WARNING: 권한 문제를 해결하려면 다음 명령어를 실행하세요:" >&2
+        echo "⚠️  WARNING: sudo chown -R $(whoami):staff logs/" >&2
+        echo "$fallback_log_file"
+        return 0
+    else
+        echo "🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요" >&2
+        echo "🛑 FATAL: 프로젝트 logs 디렉토리: $log_dir" >&2
+        echo "🛑 FATAL: 대체 logs 디렉토리: $fallback_log_dir" >&2
         exit 1
-    }
-    
-    # 성공 시 로그 파일 경로 반환
-    echo "$log_file"
+    fi
 }
 
 # 통합 로깅 함수 (로그 파일이 설정된 경우 자동 사용)
@@ -753,15 +786,6 @@ print_section_header() {
         echo "========================================="
         echo "섹션 $section_number: $section_title"
         echo "========================================="
-    fi
-}
-
-# sudo 사용 가능 여부 확인 함수
-check_sudo() {
-    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
-        return 0
-    else
-        return 1
     fi
 }
 

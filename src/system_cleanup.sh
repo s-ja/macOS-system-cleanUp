@@ -11,6 +11,10 @@
 # 에러 발생 시 스크립트 중단
 set -e
 
+# 공통 함수 로드
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/common.sh"
+
 # Print help message
 show_help() {
     echo "macos-system-cleanup v2.5 - 시스템 정리 도구"
@@ -34,6 +38,13 @@ show_help() {
     echo
     echo "참고: 시스템 캐시 정리를 위해서는 sudo 권한이 필요합니다."
     echo "      sudo $0 명령으로 실행하면 더 많은 항목을 정리할 수 있습니다."
+    echo
+    echo "권한 문제 해결:"
+    echo "  logs 디렉토리 권한 문제가 발생하면 다음 명령어를 실행하세요:"
+    echo "  sudo chown -R \$(whoami):staff logs/"
+    echo
+    echo "  또는 logs 디렉토리를 완전히 재생성:"
+    echo "  sudo rm -rf logs && mkdir -p logs"
     exit 0
 }
 
@@ -71,73 +82,31 @@ for arg in "$@"; do
     esac
 done
 
-# Set up logging
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# 로깅 시스템 초기화 (common.sh 사용)
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 LOG_DIR="$PROJECT_ROOT/logs"
-LOG_FILE="$LOG_DIR/cleanup_$(date +"%Y%m%d_%H%M%S").log"
 
-# Create the log directory if it doesn't exist
-mkdir -p "$LOG_DIR"
+# 안전한 로깅 초기화 (권한 검사 포함)
+if ! LOG_FILE=$(setup_logging "cleanup"); then
+    echo "🛑 FATAL: 로깅 시스템 초기화 실패"
+    echo "logs 디렉토리 권한을 확인하세요: $LOG_DIR"
+    exit 1
+fi
 
-# Function to handle errors
-handle_error() {
-    local error_message="$1"
-    echo "ERROR: $error_message" | tee -a "$LOG_FILE"
-    echo "Continuing with next task..." | tee -a "$LOG_FILE"
-    # 반환 코드를 추가하지만 종료하지는 않음
-    return 1
-}
+# 로깅 함수들은 common.sh에서 제공됨
+# handle_error()와 log_message() 함수는 이미 common.sh에 정의되어 있음
 
-# Function to log messages
-log_message() {
-    local message="$1"
-    echo "$(date +"%Y-%m-%d %H:%M:%S") - $message" | tee -a "$LOG_FILE"
-}
+# 스크립트 시작 로그
+log_message "========================================="
+log_message "macOS System Cleanup Utility 시작"
+log_message "========================================="
+log_message "스크립트: $0"
+log_message "로그 파일: $LOG_FILE"
+log_message "실행 사용자: $(whoami)"
+log_message "실행 시간: $(date)"
 
-# Function to calculate total space saved
-calculate_space_saved() {
-    local before=$1
-    local after=$2
-    
-    if [[ $before =~ ^[0-9]+$ ]] && [[ $after =~ ^[0-9]+$ ]]; then
-        local saved=$((after - before))
-        if [ $saved -ge 1073741824 ]; then
-            echo "$(echo "scale=2; $saved/1073741824" | bc)GB"
-        elif [ $saved -ge 1048576 ]; then
-            echo "$(echo "scale=2; $saved/1048576" | bc)MB"
-        elif [ $saved -ge 1024 ]; then
-            echo "$(echo "scale=2; $saved/1024" | bc)KB"
-        else
-            echo "${saved}B"
-        fi
-    else
-        echo "Unable to calculate"
-    fi
-}
-
-# Function to format disk space
-format_disk_space() {
-    local space=$1
-    if [ $space -ge 1073741824 ]; then
-        echo "$(echo "scale=2; $space/1073741824" | bc)GB"
-    elif [ $space -ge 1048576 ]; then
-        echo "$(echo "scale=2; $space/1048576" | bc)MB"
-    elif [ $space -ge 1024 ]; then
-        echo "$(echo "scale=2; $space/1024" | bc)KB"
-    else
-        echo "${space}B"
-    fi
-}
-
-# Function to check sudo availability
-check_sudo() {
-    if [ "$(id -u)" = "0" ] || sudo -n true 2>/dev/null; then
-        return 0
-    else
-        return 1
-    fi
-}
+# Note: calculate_space_saved, format_disk_space, check_sudo functions
+# are now provided by common.sh
 
 # Function to check if Docker daemon is running
 check_docker_daemon() {
@@ -247,10 +216,8 @@ clean_system_caches() {
     return 0
 }
 
-# Start logging
-log_message "========================================="
-log_message "Starting system cleanup process"
-log_message "========================================="
+# 시스템 정리 프로세스 시작
+log_message "시스템 정리 프로세스 시작"
 
 # Record initial system state
 INITIAL_FREE_SPACE=$(df -k / | awk 'NR==2 {print $4}')
@@ -1279,8 +1246,10 @@ else
 fi
 
 log_message "========================================="
-log_message "System cleanup completed. Log saved to: $LOG_FILE"
-log_message "End time: $(date '+%Y-%m-%d %H:%M:%S')"
+log_message "macOS System Cleanup Utility 완료"
+log_message "========================================="
+log_message "시스템 정리 완료. 로그 저장 위치: $LOG_FILE"
+log_message "종료 시간: $(date '+%Y-%m-%d %H:%M:%S')"
 log_message "========================================="
 
 # Provide some user guidance

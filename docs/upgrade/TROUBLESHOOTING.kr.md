@@ -4,6 +4,29 @@
 
 ## 일반적인 문제
 
+### 로그 파일 생성 권한 오류
+
+```bash
+🛑 FATAL: 로깅 시스템 초기화 실패
+```
+
+**해결 방법**:
+
+1. logs 디렉토리 권한 수정:
+   ```bash
+   sudo chown -R $(whoami):staff logs/
+   ```
+2. logs 디렉토리 완전 재생성:
+   ```bash
+   sudo rm -rf logs && mkdir -p logs
+   ```
+3. 대체 로그 위치 확인:
+   ```bash
+   ls -la ~/.macos-system-cleanup/logs/
+   ```
+
+**참고**: v3.1.1부터는 logs 디렉토리 권한 문제 시 자동으로 `~/.macos-system-cleanup/logs/`에 로그를 생성합니다.
+
 ### Ruby 버전 문제
 
 ```bash

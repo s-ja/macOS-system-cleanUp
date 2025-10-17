@@ -26,6 +26,29 @@ ERROR: Permission denied
    sudo ./src/cleanup/system_cleanup.sh
    ```
 
+### Log File Creation Permission Error
+
+```bash
+🛑 FATAL: 로그 파일 생성 실패. 권한 확인 필요
+```
+
+**Solutions**:
+
+1. Fix logs directory permissions:
+   ```bash
+   sudo chown -R $(whoami):staff logs/
+   ```
+2. Recreate logs directory completely:
+   ```bash
+   sudo rm -rf logs && mkdir -p logs
+   ```
+3. Check alternative log location:
+   ```bash
+   ls -la ~/.macos-system-cleanup/logs/
+   ```
+
+**Note**: Starting from v3.1.1, logs are automatically created in `~/.macos-system-cleanup/logs/` when there are permission issues with the logs directory.
+
 ### Homebrew Cleanup Fails
 
 ```bash
